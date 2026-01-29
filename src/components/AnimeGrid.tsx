@@ -45,7 +45,7 @@ const withWidthFallback = (ComposedComponent: any) => {
         }, []);
 
         return (
-            <div ref={ref} className={props.className} style={props.style}>
+            <div ref={ref} className={props.className} style={{ width: '100%', height: '100%', position: 'relative', ...props.style }}>
                 {mounted && <ComposedComponent {...props} width={width} />}
             </div>
         );
@@ -82,30 +82,36 @@ export default function AnimeGrid({ items, layouts, onLayoutChange, onDrop, onRe
         );
     }
     return (
-        <div className="w-full h-full bg-gray-900/50 rounded-xl overflow-hidden relative group/grid">
+        <div
+            className="w-full h-full bg-gray-900/50 rounded-xl overflow-hidden relative group/grid"
+            style={{ position: 'relative', width: '100%', height: '100%' }}
+        >
             {/* Axis Background */}
-            <div className="absolute inset-0 pointer-events-none z-0">
+            <div
+                className="absolute inset-0 pointer-events-none z-0"
+                style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', zIndex: 0 }}
+            >
                 {/* Y Axis line */}
                 <div className="absolute top-0 bottom-0 left-1/2 w-0.5 bg-gray-600/50 transform -translate-x-1/2"></div>
                 {/* X Axis line */}
                 <div className="absolute left-0 right-0 top-1/2 h-0.5 bg-gray-600/50 transform -translate-y-1/2"></div>
 
                 {/* Axis Labels */}
-                <div className="absolute top-4 left-1/2 transform -translate-x-1/2 text-xs font-bold text-gray-400 bg-gray-900/80 px-2 py-1 rounded border border-gray-700">
+                <div className="absolute top-4 left-1/2 transform -translate-x-1/2 text-xs font-bold text-gray-400 bg-gray-900/80 px-2 py-1 rounded border border-gray-700" style={{ position: 'absolute', top: '1rem', left: '50%', transform: 'translateX(-50%)' }}>
                     {MOCK_AXIS.top} ▲
                 </div>
-                <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2 text-xs font-bold text-gray-400 bg-gray-900/80 px-2 py-1 rounded border border-gray-700">
+                <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2 text-xs font-bold text-gray-400 bg-gray-900/80 px-2 py-1 rounded border border-gray-700" style={{ position: 'absolute', bottom: '1rem', left: '50%', transform: 'translateX(-50%)' }}>
                     ▼ {MOCK_AXIS.bottom}
                 </div>
-                <div className="absolute left-4 top-1/2 transform -translate-y-1/2 text-xs font-bold text-gray-400 bg-gray-900/80 px-2 py-1 rounded border border-gray-700">
+                <div className="absolute left-4 top-1/2 transform -translate-y-1/2 text-xs font-bold text-gray-400 bg-gray-900/80 px-2 py-1 rounded border border-gray-700" style={{ position: 'absolute', left: '1rem', top: '50%', transform: 'translateY(-50%)' }}>
                     ◀ {MOCK_AXIS.left}
                 </div>
-                <div className="absolute right-4 top-1/2 transform -translate-y-1/2 text-xs font-bold text-gray-400 bg-gray-900/80 px-2 py-1 rounded border border-gray-700">
+                <div className="absolute right-4 top-1/2 transform -translate-y-1/2 text-xs font-bold text-gray-400 bg-gray-900/80 px-2 py-1 rounded border border-gray-700" style={{ position: 'absolute', right: '1rem', top: '50%', transform: 'translateY(-50%)' }}>
                     {MOCK_AXIS.right} ▶
                 </div>
 
                 {/* Center Origin Mark */}
-                <div className="absolute left-1/2 top-1/2 w-2 h-2 bg-gray-400 rounded-full transform -translate-x-1/2 -translate-y-1/2"></div>
+                <div className="absolute left-1/2 top-1/2 w-2 h-2 bg-gray-400 rounded-full transform -translate-x-1/2 -translate-y-1/2" style={{ position: 'absolute', left: '50%', top: '50%', transform: 'translate(-50%, -50%)' }}></div>
             </div>
 
             <ResponsiveGridLayout
