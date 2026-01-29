@@ -62,9 +62,10 @@ interface AnimeGridProps {
     onLayoutChange: (layout: Layout[], layouts: { lg: Layout[] }) => void;
     onDrop: (layout: Layout[], item: Layout, e: Event) => void;
     onRemoveItem: (id: string) => void;
+    axisLabels: { top: string; bottom: string; left: string; right: string };
 }
 
-export default function AnimeGrid({ items, layouts, onLayoutChange, onDrop, onRemoveItem }: AnimeGridProps) {
+export default function AnimeGrid({ items, layouts, onLayoutChange, onDrop, onRemoveItem, axisLabels }: AnimeGridProps) {
     const [mounted, setMounted] = React.useState(false);
 
     React.useEffect(() => {
@@ -98,16 +99,16 @@ export default function AnimeGrid({ items, layouts, onLayoutChange, onDrop, onRe
 
                 {/* Axis Labels */}
                 <div className="absolute top-4 left-1/2 transform -translate-x-1/2 text-xs font-bold text-gray-400 bg-gray-900/80 px-2 py-1 rounded border border-gray-700" style={{ position: 'absolute', top: '1rem', left: '50%', transform: 'translateX(-50%)' }}>
-                    {MOCK_AXIS.top} ▲
+                    {axisLabels.top} ▲
                 </div>
                 <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2 text-xs font-bold text-gray-400 bg-gray-900/80 px-2 py-1 rounded border border-gray-700" style={{ position: 'absolute', bottom: '1rem', left: '50%', transform: 'translateX(-50%)' }}>
-                    ▼ {MOCK_AXIS.bottom}
+                    ▼ {axisLabels.bottom}
                 </div>
                 <div className="absolute left-4 top-1/2 transform -translate-y-1/2 text-xs font-bold text-gray-400 bg-gray-900/80 px-2 py-1 rounded border border-gray-700" style={{ position: 'absolute', left: '1rem', top: '50%', transform: 'translateY(-50%)' }}>
-                    ◀ {MOCK_AXIS.left}
+                    ◀ {axisLabels.left}
                 </div>
                 <div className="absolute right-4 top-1/2 transform -translate-y-1/2 text-xs font-bold text-gray-400 bg-gray-900/80 px-2 py-1 rounded border border-gray-700" style={{ position: 'absolute', right: '1rem', top: '50%', transform: 'translateY(-50%)' }}>
-                    {MOCK_AXIS.right} ▶
+                    {axisLabels.right} ▶
                 </div>
 
                 {/* Center Origin Mark */}

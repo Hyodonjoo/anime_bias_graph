@@ -4,9 +4,12 @@ import React, { useState, useEffect } from 'react';
 import { Layout } from 'react-grid-layout';
 import AnimeGrid from '@/components/AnimeGrid';
 import AnimeDock from '@/components/AnimeDock';
-import { AnimeItem, MOCK_ANIME_LIST, MOCK_THEME } from '@/lib/mockData';
+import { AnimeItem, MOCK_ANIME_LIST, MOCK_THEME, MOCK_AXIS } from '@/lib/mockData';
+import { supabase } from '@/lib/supabase';
 
 export default function Home() {
+  const [themeTitle, setThemeTitle] = useState(MOCK_THEME);
+  const [axisLabels, setAxisLabels] = useState(MOCK_AXIS);
   const [dockItems, setDockItems] = useState<AnimeItem[]>(MOCK_ANIME_LIST);
   const [gridItems, setGridItems] = useState<(AnimeItem & { layoutId: string })[]>([]);
   const [layouts, setLayouts] = useState<{ lg: Layout[] }>({ lg: [] });
@@ -14,7 +17,50 @@ export default function Home() {
 
   useEffect(() => {
     setMounted(true);
+    fetchActiveTheme();
   }, []);
+
+  const fetchActiveTheme = async () => {
+    try {
+      const { data: themes, error } = await supabase
+        .from('themes')
+        .select('*')
+        .eq('is_active', true)
+        .single();
+
+      if (error || !themes) {
+        console.log('Using mock data (database empty or error)');
+        return;
+      }
+
+      setThemeTitle(themes.title);
+      setAxisLabels({
+        top: themes.axis_top,
+        bottom: themes.axis_bottom,
+        left: themes.axis_left,
+        right: themes.axis_right
+      });
+
+      // Fetch anime items for this theme
+      const { data: animeItems } = await supabase
+        .from('anime_items')
+        .select('*')
+        .eq('theme_id', themes.id);
+
+      if (animeItems && animeItems.length > 0) {
+        const formattedItems = animeItems.map((item: any) => ({
+          id: item.id,
+          title: item.title,
+          imageUrl: item.image_url,
+          year: item.year
+        }));
+        setDockItems(formattedItems);
+      }
+
+    } catch (e) {
+      console.error("Error fetching theme:", e);
+    }
+  };
 
   const handleDrop = (layout: Layout[], layoutItem: Layout, e: DragEvent) => {
     // e is a native ResizeObserver entry?? No, in RGL onDrop, the third arg is the Event.
@@ -83,7 +129,7 @@ export default function Home() {
         <div className="flex items-center gap-4">
           <div className="w-2 h-8 bg-gradient-to-b from-blue-500 to-purple-600 rounded-full"></div>
           <h1 className="text-xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-blue-400 via-purple-400 to-pink-400">
-            {MOCK_THEME}
+            {themeTitle}
           </h1>
         </div>
         <div className="flex items-center gap-3">
@@ -110,6 +156,7 @@ export default function Home() {
           onLayoutChange={handleLayoutChange}
           onDrop={handleDrop as any}
           onRemoveItem={handleRemoveItem}
+          axisLabels={axisLabels}
         />
       </div>
 
