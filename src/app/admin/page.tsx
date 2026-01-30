@@ -16,7 +16,7 @@ export default function AdminPage() {
     const [themeTitle, setThemeTitle] = useState(MOCK_THEME);
     const [axisLabels, setAxisLabels] = useState(MOCK_AXIS);
     const [dockItems, setDockItems] = useState<AnimeItem[]>(MOCK_ANIME_LIST);
-    const [newAnime, setNewAnime] = useState({ title: '', imageUrl: '', year: 2024 });
+    const [newAnime, setNewAnime] = useState<{ id?: string, title: string, imageUrl: string, year: number }>({ id: '', title: '', imageUrl: '', year: 2024 });
 
     // History State
     const [historyThemes, setHistoryThemes] = useState<any[]>([]);
@@ -25,9 +25,7 @@ export default function AdminPage() {
     // Preview State
     const [refreshPreview, setRefreshPreview] = useState(0);
 
-    useEffect(() => {
-        fetchHistory();
-    }, [isAuthenticated]);
+    // --- Helper Functions ---
 
     const fetchHistory = async () => {
         if (!isAuthenticated) return;
@@ -64,6 +62,41 @@ export default function AdminPage() {
         // Force refresh preview
         setRefreshPreview(prev => prev + 1);
     };
+
+    const addAnimeItem = () => {
+        if (!newAnime.title || !newAnime.imageUrl) return;
+
+        if (newAnime.id) {
+            // Edit Mode
+            setDockItems(dockItems.map(item =>
+                item.id === newAnime.id
+                    ? { ...item, title: newAnime.title, imageUrl: newAnime.imageUrl, year: newAnime.year }
+                    : item
+            ));
+        } else {
+            // Add Mode
+            const newItem: AnimeItem = {
+                id: crypto.randomUUID(),
+                title: newAnime.title,
+                imageUrl: newAnime.imageUrl,
+                year: newAnime.year
+            };
+            setDockItems([...dockItems, newItem]);
+        }
+        setNewAnime({ id: '', title: '', imageUrl: '', year: 2024 });
+    };
+
+    const removeAnimeItem = (id: string) => {
+        setDockItems(dockItems.filter(i => i.id !== id));
+    };
+
+    // --- Effects ---
+
+    useEffect(() => {
+        if (isAuthenticated) {
+            fetchHistory();
+        }
+    }, [isAuthenticated]);
 
     const handlePublish = async () => {
         if (!confirm("Are you sure you want to publish this theme? This will update the live site.")) return;
@@ -105,20 +138,69 @@ export default function AdminPage() {
         }
     };
 
-    const addAnimeItem = () => {
-        if (!newAnime.title || !newAnime.imageUrl) return;
-        const newItem: AnimeItem = {
-            id: crypto.randomUUID(),
-            title: newAnime.title,
-            imageUrl: newAnime.imageUrl,
-            year: newAnime.year
-        };
-        setDockItems([...dockItems, newItem]);
-        setNewAnime({ title: '', imageUrl: '', year: 2024 });
+    // Update Existing Theme Function
+    const handleUpdateTheme = async () => {
+        if (!selectedHistoryId) return;
+        if (!confirm("Are you sure you want to overwrite this existing theme?")) return;
+
+        try {
+            // 1. Update Theme Info
+            const { error: themeError } = await supabase.from('themes').update({
+                title: themeTitle,
+                axis_top: axisLabels.top,
+                axis_bottom: axisLabels.bottom,
+                axis_left: axisLabels.left,
+                axis_right: axisLabels.right,
+            }).eq('id', selectedHistoryId);
+
+            if (themeError) throw themeError;
+
+            // 2. Sync Anime Items (Full Replacement Strategy)
+            // 2a. Delete old items
+            await supabase.from('anime_items').delete().eq('theme_id', selectedHistoryId);
+
+            // 2b. Insert new items
+            if (dockItems.length > 0) {
+                const animeToInsert = dockItems.map(item => ({
+                    theme_id: selectedHistoryId,
+                    title: item.title,
+                    image_url: item.imageUrl,
+                    year: item.year
+                }));
+                const { error: itemsError } = await supabase.from('anime_items').insert(animeToInsert);
+                if (itemsError) throw itemsError;
+            }
+
+            alert("Theme updated successfully!");
+            fetchHistory();
+        } catch (e: any) {
+            alert("Error updating theme: " + e.message);
+        }
     };
 
-    const removeAnimeItem = (id: string) => {
-        setDockItems(dockItems.filter(i => i.id !== id));
+    // Delete History
+    const handleDeleteHistory = async () => {
+        if (!selectedHistoryId) return;
+        if (!confirm("Are you sure you want to delete this theme history? This cannot be undone.")) return;
+
+        try {
+            // 1. Delete anime items (Cascading delete handles this usually, but safe to be explicit if no cascade)
+            const { error: itemsError } = await supabase.from('anime_items').delete().eq('theme_id', selectedHistoryId);
+            if (itemsError) throw itemsError;
+
+            // 2. Delete theme
+            const { error: themeError } = await supabase.from('themes').delete().eq('id', selectedHistoryId);
+            if (themeError) throw themeError;
+
+            alert("History deleted successfully.");
+            setSelectedHistoryId('');
+            fetchHistory(); // Refresh list
+
+            // Reset editor if deleted theme was loaded
+            // Optional: You might want to clear the editor or leave it as is.
+        } catch (e: any) {
+            alert("Error deleting history: " + e.message);
+        }
     };
 
     if (!isAuthenticated) {
@@ -132,6 +214,7 @@ export default function AdminPage() {
                         onChange={e => setPassword(e.target.value)}
                         className="w-full bg-gray-800 border border-gray-700 p-2 rounded mb-4"
                         placeholder="Password"
+                        suppressHydrationWarning
                     />
                     <button
                         onClick={() => setIsAuthenticated(true)} // Mock login for now
@@ -170,31 +253,6 @@ export default function AdminPage() {
             setNewAnime(prev => ({ ...prev, imageUrl: data.publicUrl }));
         } catch (error: any) {
             alert('Error uploading image: ' + error.message);
-        }
-    };
-
-    // Delete History
-    const handleDeleteHistory = async () => {
-        if (!selectedHistoryId) return;
-        if (!confirm("Are you sure you want to delete this theme history? This cannot be undone.")) return;
-
-        try {
-            // 1. Delete anime items (Cascading delete handles this usually, but safe to be explicit if no cascade)
-            const { error: itemsError } = await supabase.from('anime_items').delete().eq('theme_id', selectedHistoryId);
-            if (itemsError) throw itemsError;
-
-            // 2. Delete theme
-            const { error: themeError } = await supabase.from('themes').delete().eq('id', selectedHistoryId);
-            if (themeError) throw themeError;
-
-            alert("History deleted successfully.");
-            setSelectedHistoryId('');
-            fetchHistory(); // Refresh list
-
-            // Reset editor if deleted theme was loaded
-            // Optional: You might want to clear the editor or leave it as is.
-        } catch (e: any) {
-            alert("Error deleting history: " + e.message);
         }
     };
 
@@ -274,8 +332,21 @@ export default function AdminPage() {
                 <div className="flex-1">
                     <h3 className="text-sm font-semibold text-gray-400 uppercase tracking-wider mb-4 border-b border-gray-800 pb-2">Anime List ({dockItems.length})</h3>
 
-                    {/* Add New */}
+                    {/* Add New / Edit */}
                     <div className="p-4 bg-gray-900 rounded border border-gray-800 mb-4 space-y-3">
+                        <div className="flex justify-between items-center mb-2">
+                            <span className="text-xs font-bold text-gray-400">
+                                {newAnime.id ? 'Edit Anime' : 'Add New Anime'}
+                            </span>
+                            {newAnime.id && (
+                                <button
+                                    onClick={() => setNewAnime({ id: '', title: '', imageUrl: '', year: 2024 })}
+                                    className="text-xs text-gray-500 hover:text-white"
+                                >
+                                    Cancel Edit
+                                </button>
+                            )}
+                        </div>
                         <input
                             placeholder="Anime Title"
                             className="w-full bg-gray-950 border border-gray-700 rounded p-2 text-sm"
@@ -298,17 +369,32 @@ export default function AdminPage() {
                             </div>
                         </div>
                         <div className="flex justify-end">
-                            <button onClick={addAnimeItem} className="bg-purple-600 hover:bg-purple-700 text-xs px-3 py-2 rounded font-medium">Add Anime</button>
+                            <button
+                                onClick={addAnimeItem}
+                                className={`text-xs px-3 py-2 rounded font-medium ${newAnime.id ? 'bg-green-600 hover:bg-green-700' : 'bg-purple-600 hover:bg-purple-700'}`}
+                            >
+                                {newAnime.id ? 'Update Anime' : 'Add Anime'}
+                            </button>
                         </div>
                     </div>
 
                     {/* List */}
                     <div className="space-y-2 max-h-[300px] overflow-y-auto pr-2">
                         {dockItems.map(item => (
-                            <div key={item.id} className="flex items-center gap-3 p-2 bg-gray-900 rounded border border-gray-800 group hover:border-gray-600">
+                            <div
+                                key={item.id}
+                                onClick={() => setNewAnime({ ...item })}
+                                className={`flex items-center gap-3 p-2 rounded border cursor-pointer transition-colors ${newAnime.id === item.id ? 'bg-gray-800 border-purple-500' : 'bg-gray-900 border-gray-800 hover:border-gray-600'}`}
+                            >
                                 <img src={item.imageUrl} alt="" className="w-8 h-8 rounded object-cover" />
                                 <span className="text-xs truncate flex-1">{item.title}</span>
-                                <button onClick={() => removeAnimeItem(item.id)} className="text-red-500 hover:text-red-400 opacity-0 group-hover:opacity-100 p-1">
+                                <button
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        removeAnimeItem(item.id);
+                                    }}
+                                    className="text-red-500 hover:text-red-400 opacity-0 group-hover:opacity-100 p-1"
+                                >
                                     ✕
                                 </button>
                             </div>
@@ -316,13 +402,21 @@ export default function AdminPage() {
                     </div>
                 </div>
 
-                {/* Publish */}
-                <div className="pt-4 border-t border-gray-800 sticky bottom-0 bg-gray-900/50 backdrop-blur pb-6">
+                {/* Publish Actions */}
+                <div className="pt-4 border-t border-gray-800 sticky bottom-0 bg-gray-900/50 backdrop-blur pb-6 space-y-3">
+                    {selectedHistoryId && (
+                        <button
+                            onClick={handleUpdateTheme}
+                            className="w-full bg-gray-800 hover:bg-gray-700 py-3 rounded-lg font-bold text-white shadow-lg transition-all border border-gray-600"
+                        >
+                            Update Existing Theme
+                        </button>
+                    )}
                     <button
                         onClick={handlePublish}
                         className="w-full bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-500 hover:to-purple-500 py-3 rounded-lg font-bold text-white shadow-lg transition-all active:scale-95"
                     >
-                        Publish Changes
+                        Publish as New Theme
                     </button>
                 </div>
             </div>
