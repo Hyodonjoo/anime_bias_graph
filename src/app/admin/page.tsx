@@ -8,8 +8,10 @@ import { AnimeItem, MOCK_AXIS, MOCK_THEME, MOCK_ANIME_LIST } from '@/lib/mockDat
 import { Layout } from 'react-grid-layout';
 
 export default function AdminPage() {
-    // Auth State (Simple)
+    // Auth State (Secure)
     const [isAuthenticated, setIsAuthenticated] = useState(false);
+    const [isLoading, setIsLoading] = useState(true); // Check session on load
+    const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
 
     // Editor State
@@ -93,10 +95,73 @@ export default function AdminPage() {
     // --- Effects ---
 
     useEffect(() => {
+        // Check active session on mount
+        const checkSession = async () => {
+            try {
+                const { data: { session } } = await supabase.auth.getSession();
+                if (session?.user) {
+                    setIsAuthenticated(true);
+                }
+            } catch (error) {
+                console.error("Session check error:", error);
+            } finally {
+                setIsLoading(false);
+            }
+        };
+
+        checkSession();
+
+        // Listen for auth changes
+        const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
+            if (session?.user) {
+                setIsAuthenticated(true);
+            } else {
+                setIsAuthenticated(false);
+            }
+            setIsLoading(false);
+        });
+
+        return () => subscription.unsubscribe();
+    }, []);
+
+    // Fetch history when authenticated
+    useEffect(() => {
         if (isAuthenticated) {
             fetchHistory();
         }
     }, [isAuthenticated]);
+
+    // --- Auth Helpers ---
+
+    const handleLogin = async (e: React.FormEvent) => {
+        e.preventDefault();
+        setIsLoading(true);
+
+        try {
+            const { data, error } = await supabase.auth.signInWithPassword({
+                email,
+                password,
+            });
+
+            if (error) throw error;
+
+            // Login successful
+            if (data.user) {
+                setIsAuthenticated(true);
+            }
+        } catch (error: any) {
+            alert('Login failed: ' + error.message);
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
+    const handleLogout = async () => {
+        await supabase.auth.signOut();
+        setIsAuthenticated(false);
+        setEmail('');
+        setPassword('');
+    };
 
     const handlePublish = async () => {
         if (!confirm("Are you sure you want to publish this theme? This will update the live site.")) return;
@@ -203,26 +268,58 @@ export default function AdminPage() {
         }
     };
 
+    // Loading State
+    if (isLoading) {
+        return (
+            <div className="min-h-screen flex items-center justify-center bg-gray-950 text-white">
+                <div className="animate-pulse flex flex-col items-center">
+                    <div className="h-4 w-4 bg-purple-500 rounded-full mb-2"></div>
+                    <p className="text-sm text-gray-400">Verifying Access...</p>
+                </div>
+            </div>
+        );
+    }
+
     if (!isAuthenticated) {
         return (
             <div className="min-h-screen flex items-center justify-center bg-gray-950 text-white">
-                <div className="p-8 bg-gray-900 rounded-lg border border-gray-800">
-                    <h2 className="text-xl mb-4 font-bold">Admin Login</h2>
-                    <input
-                        type="password"
-                        value={password}
-                        onChange={e => setPassword(e.target.value)}
-                        className="w-full bg-gray-800 border border-gray-700 p-2 rounded mb-4"
-                        placeholder="Password"
-                        suppressHydrationWarning
-                    />
-                    <button
-                        onClick={() => setIsAuthenticated(true)} // Mock login for now
-                        className="w-full bg-blue-600 hover:bg-blue-700 py-2 rounded"
-                    >
-                        Login
-                    </button>
-                    <p className="text-xs text-gray-500 mt-2">* Any password works for demo</p>
+                <div className="p-8 bg-gray-900 rounded-lg border border-gray-800 w-full max-w-md shadow-2xl">
+                    <h2 className="text-2xl mb-2 font-bold bg-clip-text text-transparent bg-gradient-to-r from-blue-400 to-purple-500">
+                        Admin Access
+                    </h2>
+                    <p className="text-gray-400 text-sm mb-6">Restricted area. Authorized personnel only.</p>
+
+                    <form onSubmit={handleLogin} className="space-y-4">
+                        <div>
+                            <label className="block text-xs text-gray-500 uppercase font-bold mb-1">Email</label>
+                            <input
+                                type="email"
+                                value={email}
+                                onChange={e => setEmail(e.target.value)}
+                                className="w-full bg-gray-950 border border-gray-800 focus:border-purple-500 p-3 rounded text-sm outline-none transition-colors"
+                                placeholder="admin@example.com"
+                                required
+                            />
+                        </div>
+                        <div>
+                            <label className="block text-xs text-gray-500 uppercase font-bold mb-1">Password</label>
+                            <input
+                                type="password"
+                                value={password}
+                                onChange={e => setPassword(e.target.value)}
+                                className="w-full bg-gray-950 border border-gray-800 focus:border-purple-500 p-3 rounded text-sm outline-none transition-colors"
+                                placeholder="••••••••"
+                                required
+                            />
+                        </div>
+                        <button
+                            type="submit"
+                            disabled={isLoading}
+                            className="w-full bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-500 hover:to-purple-500 py-3 rounded font-bold text-white shadow-lg transition-transform active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                            {isLoading ? 'Verifying...' : 'Login'}
+                        </button>
+                    </form>
                 </div>
             </div>
         );
@@ -261,9 +358,17 @@ export default function AdminPage() {
             {/* Left Sidebar: Editor */}
             <div className="w-[400px] h-full overflow-y-auto border-r border-gray-800 bg-gray-900/50 p-6 flex flex-col gap-8 scrollbar-thin">
                 <div>
-                    <h2 className="text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-purple-400 to-pink-400 mb-6">
-                        Theme Editor
-                    </h2>
+                    <div className="flex justify-between items-center mb-6">
+                        <h2 className="text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-purple-400 to-pink-400">
+                            Theme Editor
+                        </h2>
+                        <button
+                            onClick={handleLogout}
+                            className="text-xs text-gray-500 hover:text-white underline"
+                        >
+                            Logout
+                        </button>
+                    </div>
 
                     {/* History */}
                     <div className="mb-6 p-4 bg-gray-900 rounded border border-gray-800">
