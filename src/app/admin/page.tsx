@@ -489,16 +489,18 @@ export default function AdminPage() {
                             <div
                                 key={item.id}
                                 onClick={() => setNewAnime({ ...item })}
-                                className={`flex items-center gap-3 p-2 rounded border cursor-pointer transition-colors ${newAnime.id === item.id ? 'bg-gray-800 border-purple-500' : 'bg-gray-900 border-gray-800 hover:border-gray-600'}`}
+                                className={`group flex items-center gap-3 p-2 rounded border cursor-pointer transition-colors ${newAnime.id === item.id ? 'bg-gray-800 border-purple-500' : 'bg-gray-900 border-gray-800 hover:border-gray-600'}`}
                             >
                                 <img src={item.imageUrl} alt="" className="w-8 h-8 rounded object-cover" />
                                 <span className="text-xs truncate flex-1">{item.title}</span>
                                 <button
                                     onClick={(e) => {
+                                        e.preventDefault();
                                         e.stopPropagation();
                                         removeAnimeItem(item.id);
                                     }}
-                                    className="text-red-500 hover:text-red-400 opacity-0 group-hover:opacity-100 p-1"
+                                    className="text-red-500 hover:text-red-400 p-2 hover:bg-gray-800 rounded transition-colors"
+                                    title="Remove Anime"
                                 >
                                     ✕
                                 </button>
