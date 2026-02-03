@@ -20,9 +20,10 @@ interface AnimeGridProps {
     axisLabels: { top: string; bottom: string; left: string; right: string };
     dockId?: string;
     isDockOpen?: boolean;
+    scale?: number;
 }
 
-export default function AnimeGrid({ items, layout, onLayoutChange, onRemoveItem, axisLabels, dockId, isDockOpen }: AnimeGridProps) {
+export default function AnimeGrid({ items, layout, onLayoutChange, onRemoveItem, axisLabels, dockId, isDockOpen, scale = 1 }: AnimeGridProps) {
     const [mounted, setMounted] = React.useState(false);
     // ...
     // ... in JSX ...
@@ -57,11 +58,12 @@ export default function AnimeGrid({ items, layout, onLayoutChange, onRemoveItem,
     }
     return (
         <div
+            id="anime-grid-content"
             className="relative group/grid"
             style={{
                 position: 'relative',
-                minWidth: '2000px', // Ensure background covers even if scrolled
-                minHeight: '2000px', // Ensure background covers even if scrolled
+                width: '1000px', // Strict width
+                height: '1000px', // Strict height
                 // Visual Grid Pattern: 20px squares
                 backgroundImage: `
                     linear-gradient(to right, rgba(75, 85, 99, 0.3) 1px, transparent 1px),
@@ -74,39 +76,39 @@ export default function AnimeGrid({ items, layout, onLayoutChange, onRemoveItem,
             {/* Axis Lines & Origin - Absolute (Scrolls with grid) */}
             <div
                 className="rounded-xl overflow-hidden absolute inset-0 pointer-events-none z-0"
-                style={{ width: '2000px', height: '2000px' }} // Explicitly set width/height for the grid content area
+                style={{ width: '1000px', height: '1000px' }} // Explicitly set width/height for the grid content area
             >
                 {/* Y Axis line */}
-                <div className="absolute top-0 bottom-0 left-1/2 w-0.5 bg-gray-600/50 transform -translate-x-1/2"></div>
+                <div className="absolute top-0 bottom-0 left-1/2 w-[2px] bg-blue-400/80 shadow-[0_0_10px_rgba(96,165,250,0.5)] transform -translate-x-1/2 z-10"></div>
                 {/* X Axis line */}
-                <div className="absolute left-0 right-0 top-1/2 h-0.5 bg-gray-600/50 transform -translate-y-1/2"></div>
+                <div className="absolute left-0 right-0 top-1/2 h-[2px] bg-blue-400/80 shadow-[0_0_10px_rgba(96,165,250,0.5)] transform -translate-y-1/2 z-10"></div>
 
                 {/* Center Origin Mark */}
-                <div className="absolute left-1/2 top-1/2 w-1 h-1 bg-gray-400 rounded-full transform -translate-x-1/2 -translate-y-1/2"></div>
+                <div className="absolute left-1/2 top-1/2 w-3 h-3 bg-blue-500 rounded-full transform -translate-x-1/2 -translate-y-1/2 z-20 shadow-[0_0_15px_rgba(59,130,246,1)]"></div>
             </div>
 
             {/* HUD / Labels Layer - Fixed Position to maintain visibility */}
             {/* Top Label */}
-            <div className="fixed top-20 left-1/2 -translate-x-1/2 z-50 pointer-events-none">
-                <span className="text-xs font-bold text-gray-400 bg-gray-900/90 px-3 py-1 rounded-full border border-gray-700 shadow-lg backdrop-blur-sm">
+            <div className="fixed top-20 left-1/2 -translate-x-1/2 z-50 pointer-events-none data-hide-export">
+                <span className="font-bold text-gray-400 bg-gray-900/90 px-3 py-1 rounded-full border border-gray-700 shadow-lg backdrop-blur-sm" style={{ fontSize: '2vh' }}>
                     {axisLabels.top} ▲
                 </span>
             </div>
             {/* Bottom Label - Dynamic position based on Dock */}
-            <div className={`fixed left-1/2 -translate-x-1/2 z-50 pointer-events-none transition-all duration-500 ease-in-out ${isDockOpen ? 'bottom-72' : 'bottom-16'}`}>
-                <span className="text-xs font-bold text-gray-400 bg-gray-900/90 px-3 py-1 rounded-full border border-gray-700 shadow-lg backdrop-blur-sm">
+            <div className={`fixed left-1/2 -translate-x-1/2 z-50 pointer-events-none transition-all duration-500 ease-in-out data-hide-export ${isDockOpen ? 'bottom-72' : 'bottom-16'}`}>
+                <span className="font-bold text-gray-400 bg-gray-900/90 px-3 py-1 rounded-full border border-gray-700 shadow-lg backdrop-blur-sm" style={{ fontSize: '2vh' }}>
                     ▼ {axisLabels.bottom}
                 </span>
             </div>
             {/* Left Label */}
-            <div className="fixed left-4 top-1/2 -translate-y-1/2 z-50 pointer-events-none">
-                <span className="text-xs font-bold text-gray-400 bg-gray-900/90 px-3 py-1 rounded-full border border-gray-700 shadow-lg backdrop-blur-sm">
+            <div className="fixed left-4 top-1/2 -translate-y-1/2 z-50 pointer-events-none data-hide-export">
+                <span className="font-bold text-gray-400 bg-gray-900/90 px-3 py-1 rounded-full border border-gray-700 shadow-lg backdrop-blur-sm" style={{ fontSize: '2vh' }}>
                     ◀ {axisLabels.left}
                 </span>
             </div>
             {/* Right Label */}
-            <div className="fixed right-4 top-1/2 -translate-y-1/2 z-50 pointer-events-none">
-                <span className="text-xs font-bold text-gray-400 bg-gray-900/90 px-3 py-1 rounded-full border border-gray-700 shadow-lg backdrop-blur-sm">
+            <div className="fixed right-4 top-1/2 -translate-y-1/2 z-50 pointer-events-none data-hide-export">
+                <span className="font-bold text-gray-400 bg-gray-900/90 px-3 py-1 rounded-full border border-gray-700 shadow-lg backdrop-blur-sm" style={{ fontSize: '2vh' }}>
                     {axisLabels.right} ▶
                 </span>
             </div>
@@ -114,9 +116,10 @@ export default function AnimeGrid({ items, layout, onLayoutChange, onRemoveItem,
             <GridLayout
                 className="layout z-10"
                 layout={layout}
-                cols={100} // 100 cols * 20px = 2000px
+                cols={50} // 50 cols * 20px = 1000px
                 rowHeight={20} // 20px Row Height
-                width={2000}
+                width={1000}
+                transformScale={scale}
                 onDragStop={handleDragStop}
                 onLayoutChange={onLayoutChange}
                 resizeHandles={['se']}
@@ -151,7 +154,7 @@ export default function AnimeGrid({ items, layout, onLayoutChange, onRemoveItem,
             </GridLayout>
 
             {items.length === 0 && (
-                <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-0">
+                <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-0 data-hide-export">
                     <div className="text-gray-600/50 text-4xl font-bold uppercase tracking-widest text-center">
                         Place Your<br />Bias Here
                     </div>

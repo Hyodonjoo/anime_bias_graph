@@ -6,7 +6,7 @@ import AnimeGrid from '@/components/AnimeGrid';
 import AnimeDock from '@/components/AnimeDock';
 import { AnimeItem, MOCK_ANIME_LIST, MOCK_THEME, MOCK_AXIS } from '@/lib/mockData';
 import { supabase } from '@/lib/supabase';
-import { ChevronUp, ChevronDown, X } from 'lucide-react';
+import { ChevronUp, ChevronDown, X, Download, Plus, Minus } from 'lucide-react';
 
 export default function Home() {
   const [themeTitle, setThemeTitle] = useState(MOCK_THEME);
@@ -14,6 +14,10 @@ export default function Home() {
   const [dockItems, setDockItems] = useState<AnimeItem[]>(MOCK_ANIME_LIST);
   const [gridItems, setGridItems] = useState<(AnimeItem & { layoutId: string })[]>([]);
   const [isDockOpen, setIsDockOpen] = useState(true);
+  const [zoomLevel, setZoomLevel] = useState(1); // 1 = 100%
+
+  const handleZoomIn = () => setZoomLevel(prev => Math.min(prev + 0.1, 1.5));
+  const handleZoomOut = () => setZoomLevel(prev => Math.max(prev - 0.1, 0.7));
 
   // Fixed layout state instead of responsive breakpoints
   const [layout, setLayout] = useState<Layout[]>([]);
@@ -53,6 +57,19 @@ export default function Home() {
       gridContainerRef.current.style.cursor = 'grab';
     }
   };
+
+  // Center the grid on mount
+  useEffect(() => {
+    if (mounted && gridContainerRef.current) {
+      setTimeout(() => {
+        const container = gridContainerRef.current;
+        if (container) {
+          container.scrollLeft = (container.scrollWidth - container.clientWidth) / 2;
+          container.scrollTop = (container.scrollHeight - container.clientHeight) / 2;
+        }
+      }, 100);
+    }
+  }, [mounted]);
 
   useEffect(() => {
     setMounted(true);
@@ -135,31 +152,44 @@ export default function Home() {
     setLayout(prev => prev.filter(l => (l as any).i !== id));
   };
 
+  const handleExport = async () => {
+    // Export functionality reset for reimplementation
+    console.log("Export Logic Cleared");
+    alert("Image export logic has been reset. Ready for new implementation.");
+  };
+
   if (!mounted) return <div className="min-h-screen bg-gray-950 text-white flex items-center justify-center">Loading...</div>;
 
   return (
-    <main className="flex h-screen flex-col bg-gray-950 text-white overflow-hidden font-sans selection:bg-purple-500/30 relative">
+    <main className="flex h-screen flex-col bg-stone-950 text-stone-200 overflow-hidden font-sans selection:bg-orange-500/30 relative">
       {/* Header */}
-      <header className="h-16 px-6 bg-gray-900/80 backdrop-blur-md border-b border-gray-800 flex justify-between items-center z-50 shadow-lg shrink-0 relative">
-        <div className="flex items-center gap-4">
-          <div className="w-2 h-8 bg-gradient-to-b from-blue-500 to-purple-600 rounded-full"></div>
-          <h1 className="text-xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-blue-400 via-purple-400 to-pink-400">
-            {themeTitle}
-          </h1>
+      {/* Header */}
+      <header className="h-16 px-6 bg-stone-900/80 backdrop-blur-md border-b border-stone-800 flex justify-between items-center z-50 shadow-lg shrink-0 relative">
+        {/* Left: Logo Placeholder */}
+        <div className="flex items-center justify-center w-[88px] h-14 bg-stone-800 rounded-md border border-stone-700 overflow-hidden shrink-0 hover:border-stone-500 transition-colors cursor-pointer relative">
+          <span className="text-[10px] text-stone-500 font-bold">550x350</span>
         </div>
+
+        {/* Center: Theme Title (No Gradient, Clean) */}
+        <h1 className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 text-xl font-bold text-stone-100 tracking-wide">
+          {themeTitle}
+        </h1>
+
+        {/* Right: Export Button */}
         <div className="flex items-center gap-3">
-          <span className="px-3 py-1 bg-gray-800 rounded-full text-xs text-gray-400 border border-gray-700">
-            Drag & Drop Off
-          </span>
-          <span className="px-3 py-1 bg-gray-800 rounded-full text-xs text-gray-400 border border-gray-700">
-            Auto-Save: Off
-          </span>
+          <button
+            onClick={handleExport}
+            className="flex items-center gap-2 px-4 py-2 bg-stone-100 hover:bg-white text-stone-900 rounded-lg text-sm font-bold shadow-md hover:shadow-lg transition-all active:scale-95"
+          >
+            <Download size={16} />
+            Save Image
+          </button>
         </div>
       </header>
 
       {/* Main Content - Grid Area */}
       <div
-        className="flex-1 relative overflow-auto flex flex-col bg-gray-950 cursor-grab active:cursor-grabbing scrollbar-hide"
+        className="flex-1 relative overflow-auto bg-stone-950 cursor-grab active:cursor-grabbing scrollbar-hide"
         ref={gridContainerRef}
         onMouseDown={handleMouseDown}
         onMouseMove={handleMouseMove}
@@ -167,15 +197,47 @@ export default function Home() {
         onMouseLeave={handleMouseUp}
         style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }} // Hide Scrollbar
       >
-        <AnimeGrid
-          items={gridItems}
-          layout={layout}
-          onLayoutChange={handleLayoutChange}
-          onRemoveItem={handleRemoveItem}
-          axisLabels={axisLabels}
-          dockId="anime-dock"
-          isDockOpen={isDockOpen}
-        />
+        <div className="flex items-center justify-center min-w-full min-h-full transition-all duration-200"
+          style={{
+            // Ensure container grows to fit zoomed content so scrolling works
+            width: zoomLevel > 1 ? `${1000 * zoomLevel}px` : '100%',
+            height: zoomLevel > 1 ? `${1000 * zoomLevel}px` : '100%'
+          }}
+        >
+          <div style={{ transform: `scale(${zoomLevel})`, transformOrigin: 'center center' }}>
+            <AnimeGrid
+              items={gridItems}
+              layout={layout}
+              onLayoutChange={handleLayoutChange}
+              onRemoveItem={handleRemoveItem}
+              axisLabels={axisLabels}
+              dockId="anime-dock"
+              isDockOpen={isDockOpen}
+              scale={zoomLevel} // Pass scale for RGL
+            />
+          </div>
+        </div>
+      </div>
+
+      {/* Zoom Controls */}
+      <div className="fixed top-24 right-8 flex flex-col gap-2 z-50">
+        <button
+          onClick={handleZoomIn}
+          className="p-2 bg-stone-800 text-stone-200 rounded-full shadow-lg hover:bg-stone-700 active:scale-95 transition-all border border-stone-700 disabled:opacity-50 disabled:cursor-not-allowed"
+          disabled={zoomLevel >= 1.5}
+        >
+          <Plus size={20} />
+        </button>
+        <div className="bg-stone-900/80 text-stone-400 text-xs font-bold py-1 px-2 rounded text-center backdrop-blur-md border border-stone-800 select-none">
+          {Math.round(zoomLevel * 100)}%
+        </div>
+        <button
+          onClick={handleZoomOut}
+          className="p-2 bg-stone-800 text-stone-200 rounded-full shadow-lg hover:bg-stone-700 active:scale-95 transition-all border border-stone-700 disabled:opacity-50 disabled:cursor-not-allowed"
+          disabled={zoomLevel <= 0.7}
+        >
+          <Minus size={20} />
+        </button>
       </div>
 
       {/* Bottom Dock - Floating Drawer */}
