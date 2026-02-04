@@ -17,13 +17,15 @@ interface AnimeGridProps {
     layout: Layout[];
     onLayoutChange: (layout: Layout[]) => void;
     onRemoveItem: (id: string) => void;
+    onDrop?: (layout: Layout[], item: Layout, event: Event) => void;
+    droppingItem?: { w: number; h: number; i: string; minW?: number; minH?: number };
     axisLabels: { top: string; bottom: string; left: string; right: string };
     dockId?: string;
     isDockOpen?: boolean;
     scale?: number;
 }
 
-export default function AnimeGrid({ items, layout, onLayoutChange, onRemoveItem, axisLabels, dockId, isDockOpen, scale = 1 }: AnimeGridProps) {
+export default function AnimeGrid({ items, layout, onLayoutChange, onRemoveItem, onDrop, droppingItem, axisLabels, dockId, isDockOpen, scale = 1 }: AnimeGridProps) {
     const [mounted, setMounted] = React.useState(false);
     // ...
     // ... in JSX ...
@@ -46,6 +48,46 @@ export default function AnimeGrid({ items, layout, onLayoutChange, onRemoveItem,
         }
     };
 
+    // Manual fallback for drop handling
+    const handleContainerDrop = (e: React.DragEvent) => {
+        e.preventDefault();
+        // If the drop target is strictly the grid layout wrapper or an empty space, handle it manually
+        // We rely on RGL's internal handling if it works, but if not, this catches it.
+        // However, RGL might not propagate the event if it handles it.
+        // Let's implement this as the PRIMARY handler if RGL's isDroppable is failing in this environment.
+
+        const container = e.currentTarget;
+        const rect = container.getBoundingClientRect();
+        const x = e.clientX - container.scrollLeft - rect.left; // Adjust for scroll if necessary, but here scroll is on parent
+        const relX = e.clientX - rect.left;
+        const relY = e.clientY - rect.top;
+
+        // Calculate Grid Position (20px cells)
+        const col = Math.floor(relX / 20);
+        const row = Math.floor(relY / 20);
+
+        // Get dimensions from droppingItem or default
+        const w = droppingItem?.w || 6;
+        const h = droppingItem?.h || 8;
+
+        const layoutItem: Layout = {
+            i: '__dropping_manual__',
+            x: col,
+            y: row,
+            w: (droppingItem && droppingItem.w) || 3, // Fallback to 3
+            h: (droppingItem && droppingItem.h) || 3, // Fallback to 3
+            minW: 3,
+            minH: 3,
+            isResizable: false
+        };
+
+        // Call the parent's onDrop handler
+        // Note: The first arg (layout) is technically unused by our current handler implementation
+        if (onDrop) {
+            onDrop(layout, layoutItem, e.nativeEvent);
+        }
+    };
+
     // Only render grid after mounting on client
     if (!mounted) {
         return (
@@ -60,6 +102,9 @@ export default function AnimeGrid({ items, layout, onLayoutChange, onRemoveItem,
         <div
             id="anime-grid-content"
             className="relative group/grid"
+            onDragOver={(e) => e.preventDefault()}
+            onDragEnter={(e) => e.preventDefault()}
+            onDrop={handleContainerDrop}
             style={{
                 position: 'relative',
                 width: '1000px', // Strict width
@@ -115,6 +160,7 @@ export default function AnimeGrid({ items, layout, onLayoutChange, onRemoveItem,
 
             <GridLayout
                 className="layout z-10"
+                style={{ height: '1000px' }}
                 layout={layout}
                 cols={50} // 50 cols * 20px = 1000px
                 rowHeight={20} // 20px Row Height
@@ -122,14 +168,17 @@ export default function AnimeGrid({ items, layout, onLayoutChange, onRemoveItem,
                 transformScale={scale}
                 onDragStop={handleDragStop}
                 onLayoutChange={onLayoutChange}
-                resizeHandles={['se']}
                 margin={[0, 0]}
                 containerPadding={[0, 0]}
                 compactType={null}
                 preventCollision={false}
+                isResizable={false}
+                isDroppable={true}
+                onDrop={onDrop}
+                droppingItem={droppingItem}
             >
                 {items.filter(item => layout.some(l => (l as any).i === item.layoutId)).map((item) => (
-                    <div key={item.layoutId} className="group relative bg-gray-800 rounded-none border border-gray-700 overflow-hidden shadow-none hover:shadow-md transition-shadow">
+                    <div key={item.layoutId} className="group relative bg-gray-800 rounded-none border border-gray-700 overflow-hidden shadow-none hover:shadow-md transition-shadow !w-[60px] !h-[60px]">
                         <div className="absolute top-0 right-0 z-20 opacity-0 group-hover:opacity-100">
                             <button
                                 onClick={(e) => { e.stopPropagation(); onRemoveItem(item.layoutId); }}

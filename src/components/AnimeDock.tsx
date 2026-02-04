@@ -19,7 +19,13 @@ export default function AnimeDock({ items }: AnimeDockProps) {
                 {items.map((item) => (
                     <div
                         key={item.id}
-                        className="flex-shrink-0 w-32 h-full bg-gray-800 rounded-lg border border-gray-700 overflow-hidden relative group hover:scale-105 transition-transform"
+                        draggable={true}
+                        onDragStart={(e) => {
+                            e.dataTransfer.setData("application/json", JSON.stringify(item));
+                            e.dataTransfer.setData("text/plain", ""); // Required for some browsers to allow dropping
+                            e.dataTransfer.effectAllowed = "copyMove";
+                        }}
+                        className="flex-shrink-0 w-32 h-full bg-gray-800 rounded-lg border border-gray-700 overflow-hidden relative group hover:scale-105 transition-transform cursor-grab active:cursor-grabbing"
                     >
                         <div className="relative w-full h-[80%]">
                             <Image

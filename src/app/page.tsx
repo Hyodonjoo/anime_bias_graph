@@ -16,6 +16,9 @@ export default function Home() {
   const [isDockOpen, setIsDockOpen] = useState(true);
   const [zoomLevel, setZoomLevel] = useState(1); // 1 = 100%
 
+  // Configuration for dropped item size
+  const DROP_SIZE = { w: 3, h: 3 };
+
   const handleZoomIn = () => setZoomLevel(prev => Math.min(prev + 0.1, 1.5));
   const handleZoomOut = () => setZoomLevel(prev => Math.max(prev - 0.1, 0.7));
 
@@ -119,28 +122,8 @@ export default function Home() {
   };
 
   const handleLayoutChange = (newLayout: Layout[]) => {
-    // Sanitize Layout: Fix weird size issues (e.g. 15x62 bug)
-    const sanitizedLayout = newLayout.map(l => {
-      let changed = false;
-      const newItem: any = { ...l };
-
-      // Force square 3x3 if it goes crazy
-      if (newItem.w > 10 || newItem.h > 10) {
-        console.warn(`Sanitizing item ${newItem.i}: Size was ${newItem.w}x${newItem.h}, forcing to 3x3`);
-        newItem.w = 3;
-        newItem.h = 3;
-        changed = true;
-      }
-
-      // Ensure min size
-      if (newItem.minW !== 3) newItem.minW = 3;
-      if (newItem.minH !== 3) newItem.minH = 3;
-
-      return newItem;
-    });
-
-    console.log("Layout Change Recieived:", sanitizedLayout);
-    setLayout(sanitizedLayout);
+    // Just update layout without forcing min sizes
+    setLayout(newLayout);
   };
 
   const handleRemoveItem = (id: string) => {
@@ -150,6 +133,37 @@ export default function Home() {
     setGridItems(prev => prev.filter(i => i.layoutId !== id));
     setDockItems(prev => [...prev, itemToRemove]);
     setLayout(prev => prev.filter(l => (l as any).i !== id));
+  };
+
+  const handleDrop = (layout: Layout[], layoutItem: Layout, _event: Event) => {
+    const event = _event as DragEvent;
+    const data = event.dataTransfer?.getData("application/json");
+    if (!data) return;
+
+    try {
+      const itemData = JSON.parse(data);
+      // Remove from dock
+      setDockItems(prev => prev.filter(i => i.id !== itemData.id));
+
+      const newLayoutId = `${itemData.id}-${Date.now()}`;
+
+      // Add to grid
+      setGridItems(prev => [...prev, { ...itemData, layoutId: newLayoutId }]);
+
+      // Update Layout
+      // The `layout` param passed to onDrop contains the new item with the calculated position
+      // We just need to ensure the ID matches and force correct settings
+      const newLayoutItem = {
+        ...layoutItem,
+        i: newLayoutId,
+        isResizable: false, // Disable resizing
+      };
+
+      setLayout(prev => [...prev, newLayoutItem]);
+
+    } catch (e) {
+      console.error("Failed to parse drop data", e);
+    }
   };
 
   const handleExport = async () => {
@@ -214,6 +228,8 @@ export default function Home() {
               dockId="anime-dock"
               isDockOpen={isDockOpen}
               scale={zoomLevel} // Pass scale for RGL
+              onDrop={handleDrop}
+              droppingItem={{ i: '__dropping-elem__', w: DROP_SIZE.w, h: DROP_SIZE.h }}
             />
           </div>
         </div>
@@ -238,6 +254,8 @@ export default function Home() {
         >
           <Minus size={20} />
         </button>
+
+
       </div>
 
       {/* Bottom Dock - Floating Drawer */}
