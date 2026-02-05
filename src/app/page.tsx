@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useRef } from 'react';
-import { Layout } from 'react-grid-layout';
+import { Layout } from '@/types/layout';
 import AnimeGrid from '@/components/AnimeGrid';
 import AnimeDock from '@/components/AnimeDock';
 import { AnimeItem } from '@/lib/mockData';
@@ -16,8 +16,8 @@ export default function Home() {
   const [isDockOpen, setIsDockOpen] = useState(true);
   const [zoomLevel, setZoomLevel] = useState(1); // 1 = 100%
 
-  // Configuration for dropped item size
-  const DROP_SIZE = { w: 3, h: 3 };
+  // Configuration for dropped item size (pixels)
+  const DROP_SIZE = { w: 60, h: 60 };
 
   const handleZoomIn = () => setZoomLevel(prev => Math.min(prev + 0.1, 1.5));
   const handleZoomOut = () => setZoomLevel(prev => Math.max(prev - 0.1, 0.7));

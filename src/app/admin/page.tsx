@@ -5,7 +5,7 @@ import { supabase } from '@/lib/supabase';
 import AnimeGrid from '@/components/AnimeGrid';
 import AnimeDock from '@/components/AnimeDock';
 import { AnimeItem, MOCK_AXIS, MOCK_THEME, MOCK_ANIME_LIST } from '@/lib/mockData';
-import { Layout } from 'react-grid-layout';
+
 
 export default function AdminPage() {
     // Auth State (Secure)
