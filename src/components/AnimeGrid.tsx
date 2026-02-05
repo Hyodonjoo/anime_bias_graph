@@ -88,6 +88,25 @@ export default function AnimeGrid({ items, layout, onLayoutChange, onRemoveItem,
         }
     };
 
+    const [dragPos, setDragPos] = React.useState<{ x: number; y: number } | null>(null);
+
+    const handleDragOver = (e: React.DragEvent) => {
+        e.preventDefault();
+        const container = e.currentTarget;
+        const rect = container.getBoundingClientRect();
+
+        // Calculate relative position accounting for scale if necessary
+        // Note: RGL handles scale internally, but our calculation for grid cells needs raw pixels relative to container top-left
+        const x = e.clientX - rect.left;
+        const y = e.clientY - rect.top;
+
+        // Grid Dimensions: 20px squares
+        const col = Math.floor(x / 20);
+        const row = Math.floor(y / 20);
+
+        setDragPos({ x: col, y: row });
+    };
+
     // Only render grid after mounting on client
     if (!mounted) {
         return (
@@ -102,9 +121,12 @@ export default function AnimeGrid({ items, layout, onLayoutChange, onRemoveItem,
         <div
             id="anime-grid-content"
             className="relative group/grid"
-            onDragOver={(e) => e.preventDefault()}
+            onDragOver={handleDragOver}
             onDragEnter={(e) => e.preventDefault()}
-            onDrop={handleContainerDrop}
+            onDrop={(e) => {
+                setDragPos(null); // Reset on drop
+                handleContainerDrop(e);
+            }}
             style={{
                 position: 'relative',
                 width: '1000px', // Strict width
@@ -175,7 +197,7 @@ export default function AnimeGrid({ items, layout, onLayoutChange, onRemoveItem,
                 isResizable={false}
                 isDroppable={true}
                 onDrop={onDrop}
-                droppingItem={droppingItem}
+                droppingItem={droppingItem ? { ...droppingItem, ...dragPos } : undefined}
             >
                 {items.filter(item => layout.some(l => (l as any).i === item.layoutId)).map((item) => (
                     <div key={item.layoutId} className="group relative bg-gray-800 rounded-none border border-gray-700 overflow-hidden shadow-none hover:shadow-md transition-shadow !w-[60px] !h-[60px]">

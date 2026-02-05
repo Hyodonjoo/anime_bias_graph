@@ -4,14 +4,14 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Layout } from 'react-grid-layout';
 import AnimeGrid from '@/components/AnimeGrid';
 import AnimeDock from '@/components/AnimeDock';
-import { AnimeItem, MOCK_ANIME_LIST, MOCK_THEME, MOCK_AXIS } from '@/lib/mockData';
+import { AnimeItem } from '@/lib/mockData';
 import { supabase } from '@/lib/supabase';
 import { ChevronUp, ChevronDown, X, Download, Plus, Minus } from 'lucide-react';
 
 export default function Home() {
-  const [themeTitle, setThemeTitle] = useState(MOCK_THEME);
-  const [axisLabels, setAxisLabels] = useState(MOCK_AXIS);
-  const [dockItems, setDockItems] = useState<AnimeItem[]>(MOCK_ANIME_LIST);
+  const [themeTitle, setThemeTitle] = useState('');
+  const [axisLabels, setAxisLabels] = useState({ top: '', bottom: '', left: '', right: '' });
+  const [dockItems, setDockItems] = useState<AnimeItem[]>([]);
   const [gridItems, setGridItems] = useState<(AnimeItem & { layoutId: string })[]>([]);
   const [isDockOpen, setIsDockOpen] = useState(true);
   const [zoomLevel, setZoomLevel] = useState(1); // 1 = 100%
