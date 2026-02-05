@@ -211,27 +211,19 @@ export default function Home() {
         onMouseLeave={handleMouseUp}
         style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }} // Hide Scrollbar
       >
-        <div className="flex items-center justify-center min-w-full min-h-full transition-all duration-200"
-          style={{
-            // Ensure container grows to fit zoomed content so scrolling works
-            width: zoomLevel > 1 ? `${1000 * zoomLevel}px` : '100%',
-            height: zoomLevel > 1 ? `${1000 * zoomLevel}px` : '100%'
-          }}
-        >
-          <div style={{ transform: `scale(${zoomLevel})`, transformOrigin: 'center center' }}>
-            <AnimeGrid
-              items={gridItems}
-              layout={layout}
-              onLayoutChange={handleLayoutChange}
-              onRemoveItem={handleRemoveItem}
-              axisLabels={axisLabels}
-              dockId="anime-dock"
-              isDockOpen={isDockOpen}
-              scale={zoomLevel} // Pass scale for RGL
-              onDrop={handleDrop}
-              droppingItem={{ i: '__dropping-elem__', w: DROP_SIZE.w, h: DROP_SIZE.h }}
-            />
-          </div>
+        <div className="flex items-center justify-center min-w-full min-h-full">
+          <AnimeGrid
+            items={gridItems}
+            layout={layout}
+            onLayoutChange={handleLayoutChange}
+            onRemoveItem={handleRemoveItem}
+            axisLabels={axisLabels}
+            dockId="anime-dock"
+            isDockOpen={isDockOpen}
+            scale={zoomLevel} // Pass scale for RGL
+            onDrop={handleDrop}
+            droppingItem={{ i: '__dropping-elem__', w: DROP_SIZE.w, h: DROP_SIZE.h }}
+          />
         </div>
       </div>
 
@@ -254,9 +246,9 @@ export default function Home() {
         >
           <Minus size={20} />
         </button>
-
-
       </div>
+
+
 
       {/* Bottom Dock - Floating Drawer */}
       <div
@@ -266,21 +258,12 @@ export default function Home() {
           w-[95vw] md:w-[90vw] lg:w-[1400px] h-48`}
       >
         {/* Toggle Handle */}
+        {/* Toggle Handle - Moved to Right (Offset) and Larger */}
         <button
           onClick={() => setIsDockOpen(!isDockOpen)}
-          className="absolute -top-8 left-1/2 -translate-x-1/2 h-8 px-12 bg-gray-800/90 hover:bg-gray-700 backdrop-blur-md border-t border-x border-gray-600/50 rounded-t-xl flex items-center justify-center text-gray-400 hover:text-white transition-colors shadow-[0_-5px_15px_rgba(0,0,0,0.3)] group"
+          className="absolute -top-10 right-8 h-10 px-6 bg-gray-800/90 hover:bg-gray-700 backdrop-blur-md border border-gray-600/50 rounded-lg flex items-center justify-center gap-2 text-gray-400 hover:text-white transition-all shadow-[0_-5px_15px_rgba(0,0,0,0.3)] group z-50"
         >
-          {isDockOpen ? (
-            <div className="flex items-center gap-2">
-              <span className="text-[10px] font-bold uppercase tracking-widest opacity-0 group-hover:opacity-100 transition-opacity absolute left-4">Close</span>
-              <ChevronDown size={16} />
-            </div>
-          ) : (
-            <div className="flex items-center gap-2">
-              <span className="text-[10px] font-bold uppercase tracking-widest opacity-0 group-hover:opacity-100 transition-opacity absolute left-4">Open</span>
-              <ChevronUp size={16} />
-            </div>
-          )}
+          {isDockOpen ? <ChevronDown size={24} /> : <ChevronUp size={24} />}
         </button>
 
         {/* Dock Content */}
