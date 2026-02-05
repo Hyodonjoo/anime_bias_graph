@@ -5,18 +5,20 @@ import { supabase } from '@/lib/supabase';
 import AnimeGrid from '@/components/AnimeGrid';
 import AnimeDock from '@/components/AnimeDock';
 import { AnimeItem, MOCK_AXIS, MOCK_THEME, MOCK_ANIME_LIST } from '@/lib/mockData';
-import { Layout } from 'react-grid-layout';
+
 
 export default function AdminPage() {
-    // Auth State (Simple)
+    // Auth State (Secure)
     const [isAuthenticated, setIsAuthenticated] = useState(false);
+    const [isLoading, setIsLoading] = useState(true); // Check session on load
+    const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
 
     // Editor State
     const [themeTitle, setThemeTitle] = useState(MOCK_THEME);
     const [axisLabels, setAxisLabels] = useState(MOCK_AXIS);
     const [dockItems, setDockItems] = useState<AnimeItem[]>(MOCK_ANIME_LIST);
-    const [newAnime, setNewAnime] = useState({ title: '', imageUrl: '', year: 2024 });
+    const [newAnime, setNewAnime] = useState<{ id?: string, title: string, imageUrl: string, year: number }>({ id: '', title: '', imageUrl: '', year: 2024 });
 
     // History State
     const [historyThemes, setHistoryThemes] = useState<any[]>([]);
@@ -25,9 +27,7 @@ export default function AdminPage() {
     // Preview State
     const [refreshPreview, setRefreshPreview] = useState(0);
 
-    useEffect(() => {
-        fetchHistory();
-    }, [isAuthenticated]);
+    // --- Helper Functions ---
 
     const fetchHistory = async () => {
         if (!isAuthenticated) return;
@@ -63,6 +63,104 @@ export default function AdminPage() {
 
         // Force refresh preview
         setRefreshPreview(prev => prev + 1);
+    };
+
+    const addAnimeItem = () => {
+        if (!newAnime.title || !newAnime.imageUrl) return;
+
+        if (newAnime.id) {
+            // Edit Mode
+            setDockItems(dockItems.map(item =>
+                item.id === newAnime.id
+                    ? { ...item, title: newAnime.title, imageUrl: newAnime.imageUrl, year: newAnime.year }
+                    : item
+            ));
+        } else {
+            // Add Mode
+            const newItem: AnimeItem = {
+                id: crypto.randomUUID(),
+                title: newAnime.title,
+                imageUrl: newAnime.imageUrl,
+                year: newAnime.year
+            };
+            setDockItems([...dockItems, newItem]);
+        }
+        setNewAnime({ id: '', title: '', imageUrl: '', year: 2024 });
+    };
+
+    const removeAnimeItem = (id: string) => {
+        setDockItems(dockItems.filter(i => i.id !== id));
+    };
+
+    // --- Effects ---
+
+    useEffect(() => {
+        // Check active session on mount
+        const checkSession = async () => {
+            try {
+                const { data: { session } } = await supabase.auth.getSession();
+                if (session?.user) {
+                    setIsAuthenticated(true);
+                }
+            } catch (error) {
+                console.error("Session check error:", error);
+            } finally {
+                setIsLoading(false);
+            }
+        };
+
+        checkSession();
+
+        // Listen for auth changes
+        const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
+            if (session?.user) {
+                setIsAuthenticated(true);
+            } else {
+                setIsAuthenticated(false);
+            }
+            setIsLoading(false);
+        });
+
+        return () => subscription.unsubscribe();
+    }, []);
+
+    // Fetch history when authenticated
+    useEffect(() => {
+        if (isAuthenticated) {
+            fetchHistory();
+        }
+    }, [isAuthenticated]);
+
+    // --- Auth Helpers ---
+
+    const handleLogin = async (e: React.FormEvent) => {
+        e.preventDefault();
+        setIsLoading(true);
+
+        try {
+            const { data, error } = await supabase.auth.signInWithPassword({
+                email,
+                password,
+            });
+
+            if (error) throw error;
+
+            // Login successful
+            if (data.user) {
+                setIsAuthenticated(true);
+            }
+        } catch (error: any) {
+            alert('Login failed: ' + error.message);
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
+    const handleLogout = async () => {
+        await supabase.auth.signOut();
+        setIsAuthenticated(false);
+        setEmail('');
+        setPassword('');
     };
 
     const handlePublish = async () => {
@@ -105,41 +203,123 @@ export default function AdminPage() {
         }
     };
 
-    const addAnimeItem = () => {
-        if (!newAnime.title || !newAnime.imageUrl) return;
-        const newItem: AnimeItem = {
-            id: crypto.randomUUID(),
-            title: newAnime.title,
-            imageUrl: newAnime.imageUrl,
-            year: newAnime.year
-        };
-        setDockItems([...dockItems, newItem]);
-        setNewAnime({ title: '', imageUrl: '', year: 2024 });
+    // Update Existing Theme Function
+    const handleUpdateTheme = async () => {
+        if (!selectedHistoryId) return;
+        if (!confirm("Are you sure you want to overwrite this existing theme?")) return;
+
+        try {
+            // 1. Update Theme Info
+            const { error: themeError } = await supabase.from('themes').update({
+                title: themeTitle,
+                axis_top: axisLabels.top,
+                axis_bottom: axisLabels.bottom,
+                axis_left: axisLabels.left,
+                axis_right: axisLabels.right,
+            }).eq('id', selectedHistoryId);
+
+            if (themeError) throw themeError;
+
+            // 2. Sync Anime Items (Full Replacement Strategy)
+            // 2a. Delete old items
+            await supabase.from('anime_items').delete().eq('theme_id', selectedHistoryId);
+
+            // 2b. Insert new items
+            if (dockItems.length > 0) {
+                const animeToInsert = dockItems.map(item => ({
+                    theme_id: selectedHistoryId,
+                    title: item.title,
+                    image_url: item.imageUrl,
+                    year: item.year
+                }));
+                const { error: itemsError } = await supabase.from('anime_items').insert(animeToInsert);
+                if (itemsError) throw itemsError;
+            }
+
+            alert("Theme updated successfully!");
+            fetchHistory();
+        } catch (e: any) {
+            alert("Error updating theme: " + e.message);
+        }
     };
 
-    const removeAnimeItem = (id: string) => {
-        setDockItems(dockItems.filter(i => i.id !== id));
+    // Delete History
+    const handleDeleteHistory = async () => {
+        if (!selectedHistoryId) return;
+        if (!confirm("Are you sure you want to delete this theme history? This cannot be undone.")) return;
+
+        try {
+            // 1. Delete anime items (Cascading delete handles this usually, but safe to be explicit if no cascade)
+            const { error: itemsError } = await supabase.from('anime_items').delete().eq('theme_id', selectedHistoryId);
+            if (itemsError) throw itemsError;
+
+            // 2. Delete theme
+            const { error: themeError } = await supabase.from('themes').delete().eq('id', selectedHistoryId);
+            if (themeError) throw themeError;
+
+            alert("History deleted successfully.");
+            setSelectedHistoryId('');
+            fetchHistory(); // Refresh list
+
+            // Reset editor if deleted theme was loaded
+            // Optional: You might want to clear the editor or leave it as is.
+        } catch (e: any) {
+            alert("Error deleting history: " + e.message);
+        }
     };
+
+    // Loading State
+    if (isLoading) {
+        return (
+            <div className="min-h-screen flex items-center justify-center bg-gray-950 text-white">
+                <div className="animate-pulse flex flex-col items-center">
+                    <div className="h-4 w-4 bg-purple-500 rounded-full mb-2"></div>
+                    <p className="text-sm text-gray-400">Verifying Access...</p>
+                </div>
+            </div>
+        );
+    }
 
     if (!isAuthenticated) {
         return (
             <div className="min-h-screen flex items-center justify-center bg-gray-950 text-white">
-                <div className="p-8 bg-gray-900 rounded-lg border border-gray-800">
-                    <h2 className="text-xl mb-4 font-bold">Admin Login</h2>
-                    <input
-                        type="password"
-                        value={password}
-                        onChange={e => setPassword(e.target.value)}
-                        className="w-full bg-gray-800 border border-gray-700 p-2 rounded mb-4"
-                        placeholder="Password"
-                    />
-                    <button
-                        onClick={() => setIsAuthenticated(true)} // Mock login for now
-                        className="w-full bg-blue-600 hover:bg-blue-700 py-2 rounded"
-                    >
-                        Login
-                    </button>
-                    <p className="text-xs text-gray-500 mt-2">* Any password works for demo</p>
+                <div className="p-8 bg-gray-900 rounded-lg border border-gray-800 w-full max-w-md shadow-2xl">
+                    <h2 className="text-2xl mb-2 font-bold bg-clip-text text-transparent bg-gradient-to-r from-blue-400 to-purple-500">
+                        Admin Access
+                    </h2>
+                    <p className="text-gray-400 text-sm mb-6">Restricted area. Authorized personnel only.</p>
+
+                    <form onSubmit={handleLogin} className="space-y-4">
+                        <div>
+                            <label className="block text-xs text-gray-500 uppercase font-bold mb-1">Email</label>
+                            <input
+                                type="email"
+                                value={email}
+                                onChange={e => setEmail(e.target.value)}
+                                className="w-full bg-gray-950 border border-gray-800 focus:border-purple-500 p-3 rounded text-sm outline-none transition-colors"
+                                placeholder="admin@example.com"
+                                required
+                            />
+                        </div>
+                        <div>
+                            <label className="block text-xs text-gray-500 uppercase font-bold mb-1">Password</label>
+                            <input
+                                type="password"
+                                value={password}
+                                onChange={e => setPassword(e.target.value)}
+                                className="w-full bg-gray-950 border border-gray-800 focus:border-purple-500 p-3 rounded text-sm outline-none transition-colors"
+                                placeholder="••••••••"
+                                required
+                            />
+                        </div>
+                        <button
+                            type="submit"
+                            disabled={isLoading}
+                            className="w-full bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-500 hover:to-purple-500 py-3 rounded font-bold text-white shadow-lg transition-transform active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                            {isLoading ? 'Verifying...' : 'Login'}
+                        </button>
+                    </form>
                 </div>
             </div>
         );
@@ -173,39 +353,22 @@ export default function AdminPage() {
         }
     };
 
-    // Delete History
-    const handleDeleteHistory = async () => {
-        if (!selectedHistoryId) return;
-        if (!confirm("Are you sure you want to delete this theme history? This cannot be undone.")) return;
-
-        try {
-            // 1. Delete anime items (Cascading delete handles this usually, but safe to be explicit if no cascade)
-            const { error: itemsError } = await supabase.from('anime_items').delete().eq('theme_id', selectedHistoryId);
-            if (itemsError) throw itemsError;
-
-            // 2. Delete theme
-            const { error: themeError } = await supabase.from('themes').delete().eq('id', selectedHistoryId);
-            if (themeError) throw themeError;
-
-            alert("History deleted successfully.");
-            setSelectedHistoryId('');
-            fetchHistory(); // Refresh list
-
-            // Reset editor if deleted theme was loaded
-            // Optional: You might want to clear the editor or leave it as is.
-        } catch (e: any) {
-            alert("Error deleting history: " + e.message);
-        }
-    };
-
     return (
         <div className="h-screen w-full flex bg-gray-950 text-white overflow-hidden">
             {/* Left Sidebar: Editor */}
             <div className="w-[400px] h-full overflow-y-auto border-r border-gray-800 bg-gray-900/50 p-6 flex flex-col gap-8 scrollbar-thin">
                 <div>
-                    <h2 className="text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-purple-400 to-pink-400 mb-6">
-                        Theme Editor
-                    </h2>
+                    <div className="flex justify-between items-center mb-6">
+                        <h2 className="text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-purple-400 to-pink-400">
+                            Theme Editor
+                        </h2>
+                        <button
+                            onClick={handleLogout}
+                            className="text-xs text-gray-500 hover:text-white underline"
+                        >
+                            Logout
+                        </button>
+                    </div>
 
                     {/* History */}
                     <div className="mb-6 p-4 bg-gray-900 rounded border border-gray-800">
@@ -274,8 +437,21 @@ export default function AdminPage() {
                 <div className="flex-1">
                     <h3 className="text-sm font-semibold text-gray-400 uppercase tracking-wider mb-4 border-b border-gray-800 pb-2">Anime List ({dockItems.length})</h3>
 
-                    {/* Add New */}
+                    {/* Add New / Edit */}
                     <div className="p-4 bg-gray-900 rounded border border-gray-800 mb-4 space-y-3">
+                        <div className="flex justify-between items-center mb-2">
+                            <span className="text-xs font-bold text-gray-400">
+                                {newAnime.id ? 'Edit Anime' : 'Add New Anime'}
+                            </span>
+                            {newAnime.id && (
+                                <button
+                                    onClick={() => setNewAnime({ id: '', title: '', imageUrl: '', year: 2024 })}
+                                    className="text-xs text-gray-500 hover:text-white"
+                                >
+                                    Cancel Edit
+                                </button>
+                            )}
+                        </div>
                         <input
                             placeholder="Anime Title"
                             className="w-full bg-gray-950 border border-gray-700 rounded p-2 text-sm"
@@ -298,17 +474,34 @@ export default function AdminPage() {
                             </div>
                         </div>
                         <div className="flex justify-end">
-                            <button onClick={addAnimeItem} className="bg-purple-600 hover:bg-purple-700 text-xs px-3 py-2 rounded font-medium">Add Anime</button>
+                            <button
+                                onClick={addAnimeItem}
+                                className={`text-xs px-3 py-2 rounded font-medium ${newAnime.id ? 'bg-green-600 hover:bg-green-700' : 'bg-purple-600 hover:bg-purple-700'}`}
+                            >
+                                {newAnime.id ? 'Update Anime' : 'Add Anime'}
+                            </button>
                         </div>
                     </div>
 
                     {/* List */}
                     <div className="space-y-2 max-h-[300px] overflow-y-auto pr-2">
                         {dockItems.map(item => (
-                            <div key={item.id} className="flex items-center gap-3 p-2 bg-gray-900 rounded border border-gray-800 group hover:border-gray-600">
+                            <div
+                                key={item.id}
+                                onClick={() => setNewAnime({ ...item })}
+                                className={`group flex items-center gap-3 p-2 rounded border cursor-pointer transition-colors ${newAnime.id === item.id ? 'bg-gray-800 border-purple-500' : 'bg-gray-900 border-gray-800 hover:border-gray-600'}`}
+                            >
                                 <img src={item.imageUrl} alt="" className="w-8 h-8 rounded object-cover" />
                                 <span className="text-xs truncate flex-1">{item.title}</span>
-                                <button onClick={() => removeAnimeItem(item.id)} className="text-red-500 hover:text-red-400 opacity-0 group-hover:opacity-100 p-1">
+                                <button
+                                    onClick={(e) => {
+                                        e.preventDefault();
+                                        e.stopPropagation();
+                                        removeAnimeItem(item.id);
+                                    }}
+                                    className="text-red-500 hover:text-red-400 p-2 hover:bg-gray-800 rounded transition-colors"
+                                    title="Remove Anime"
+                                >
                                     ✕
                                 </button>
                             </div>
@@ -316,13 +509,21 @@ export default function AdminPage() {
                     </div>
                 </div>
 
-                {/* Publish */}
-                <div className="pt-4 border-t border-gray-800 sticky bottom-0 bg-gray-900/50 backdrop-blur pb-6">
+                {/* Publish Actions */}
+                <div className="pt-4 border-t border-gray-800 sticky bottom-0 bg-gray-900/50 backdrop-blur pb-6 space-y-3">
+                    {selectedHistoryId && (
+                        <button
+                            onClick={handleUpdateTheme}
+                            className="w-full bg-gray-800 hover:bg-gray-700 py-3 rounded-lg font-bold text-white shadow-lg transition-all border border-gray-600"
+                        >
+                            Update Existing Theme
+                        </button>
+                    )}
                     <button
                         onClick={handlePublish}
                         className="w-full bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-500 hover:to-purple-500 py-3 rounded-lg font-bold text-white shadow-lg transition-all active:scale-95"
                     >
-                        Publish Changes
+                        Publish as New Theme
                     </button>
                 </div>
             </div>

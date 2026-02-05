@@ -1,19 +1,78 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
-import { Layout } from 'react-grid-layout';
+import React, { useState, useEffect, useRef } from 'react';
+import { Layout } from '@/types/layout';
 import AnimeGrid from '@/components/AnimeGrid';
 import AnimeDock from '@/components/AnimeDock';
-import { AnimeItem, MOCK_ANIME_LIST, MOCK_THEME, MOCK_AXIS } from '@/lib/mockData';
+import { AnimeItem } from '@/lib/mockData';
 import { supabase } from '@/lib/supabase';
+import { ChevronUp, ChevronDown, X, Download, Plus, Minus } from 'lucide-react';
 
 export default function Home() {
-  const [themeTitle, setThemeTitle] = useState(MOCK_THEME);
-  const [axisLabels, setAxisLabels] = useState(MOCK_AXIS);
-  const [dockItems, setDockItems] = useState<AnimeItem[]>(MOCK_ANIME_LIST);
+  const [themeTitle, setThemeTitle] = useState('');
+  const [axisLabels, setAxisLabels] = useState({ top: '', bottom: '', left: '', right: '' });
+  const [dockItems, setDockItems] = useState<AnimeItem[]>([]);
   const [gridItems, setGridItems] = useState<(AnimeItem & { layoutId: string })[]>([]);
-  const [layouts, setLayouts] = useState<{ lg: Layout[] }>({ lg: [] });
+  const [isDockOpen, setIsDockOpen] = useState(true);
+  const [zoomLevel, setZoomLevel] = useState(1); // 1 = 100%
+
+  // Configuration for dropped item size (pixels)
+  const DROP_SIZE = { w: 60, h: 60 };
+
+  const handleZoomIn = () => setZoomLevel(prev => Math.min(prev + 0.1, 1.5));
+  const handleZoomOut = () => setZoomLevel(prev => Math.max(prev - 0.1, 0.7));
+
+  // Fixed layout state instead of responsive breakpoints
+  const [layout, setLayout] = useState<Layout[]>([]);
   const [mounted, setMounted] = useState(false);
+
+  // Drag to Scroll Refs
+  const gridContainerRef = useRef<HTMLDivElement>(null);
+  const isPanningRef = useRef(false);
+  const startPosRef = useRef({ x: 0, y: 0 });
+  const scrollPosRef = useRef({ left: 0, top: 0 });
+
+  const handleMouseDown = (e: React.MouseEvent) => {
+    if (!gridContainerRef.current) return;
+    // Allow default interaction (e.g. text selection or clicking buttons) unless it's the specific background
+    // But since we want "Drag Map", usually background drag is intended.
+    isPanningRef.current = true;
+    startPosRef.current = { x: e.pageX, y: e.pageY };
+    scrollPosRef.current = {
+      left: gridContainerRef.current.scrollLeft,
+      top: gridContainerRef.current.scrollTop
+    };
+    gridContainerRef.current.style.cursor = 'grabbing';
+  };
+
+  const handleMouseMove = (e: React.MouseEvent) => {
+    if (!isPanningRef.current || !gridContainerRef.current) return;
+    e.preventDefault();
+    const x = e.pageX - startPosRef.current.x;
+    const y = e.pageY - startPosRef.current.y;
+    gridContainerRef.current.scrollLeft = scrollPosRef.current.left - x;
+    gridContainerRef.current.scrollTop = scrollPosRef.current.top - y;
+  };
+
+  const handleMouseUp = () => {
+    isPanningRef.current = false;
+    if (gridContainerRef.current) {
+      gridContainerRef.current.style.cursor = 'grab';
+    }
+  };
+
+  // Center the grid on mount
+  useEffect(() => {
+    if (mounted && gridContainerRef.current) {
+      setTimeout(() => {
+        const container = gridContainerRef.current;
+        if (container) {
+          container.scrollLeft = (container.scrollWidth - container.clientWidth) / 2;
+          container.scrollTop = (container.scrollHeight - container.clientHeight) / 2;
+        }
+      }, 100);
+    }
+  }, [mounted]);
 
   useEffect(() => {
     setMounted(true);
@@ -62,49 +121,9 @@ export default function Home() {
     }
   };
 
-  const handleDrop = (layout: Layout[], layoutItem: Layout, e: DragEvent) => {
-    // e is a native ResizeObserver entry?? No, in RGL onDrop, the third arg is the Event.
-    // However, generic Event might not have dataTransfer property in TS types without casting.
-    const dragEvent = e as unknown as React.DragEvent;
-
-    const itemDataString = dragEvent.dataTransfer?.getData("text/plain");
-    if (!itemDataString) return;
-
-    try {
-      const itemData: AnimeItem = JSON.parse(itemDataString);
-
-      // Avoid duplicates
-      if (gridItems.some(i => i.id === itemData.id)) return;
-
-      const newGridItem = { ...itemData, layoutId: itemData.id };
-
-      setGridItems(prev => [...prev, newGridItem]);
-      setDockItems(prev => prev.filter(i => i.id !== itemData.id));
-
-      // Create new layout item based on drop position
-      // The RGL internal state might update automatically for the 'dropping-elem', 
-      // but we need to persist it as a real item with the correct ID.
-      const newLayoutItem: Layout = {
-        ...layoutItem,
-        i: newGridItem.layoutId,
-        w: 3,
-        h: 7,
-        minW: 2,
-        minH: 4
-      };
-
-      setLayouts(prev => ({
-        ...prev,
-        lg: [...(prev.lg || []), newLayoutItem]
-      }));
-
-    } catch (err) {
-      console.error("Failed to parse drop data", err);
-    }
-  };
-
-  const handleLayoutChange = (layout: Layout[], allLayouts: { lg: Layout[] }) => {
-    setLayouts(allLayouts);
+  const handleLayoutChange = (newLayout: Layout[]) => {
+    // Just update layout without forcing min sizes
+    setLayout(newLayout);
   };
 
   const handleRemoveItem = (id: string) => {
@@ -113,56 +132,144 @@ export default function Home() {
 
     setGridItems(prev => prev.filter(i => i.layoutId !== id));
     setDockItems(prev => [...prev, itemToRemove]);
+    setLayout(prev => prev.filter(l => (l as any).i !== id));
+  };
 
-    setLayouts(prev => ({
-      ...prev,
-      lg: (prev.lg || []).filter(l => l.i !== id)
-    }));
+  const handleDrop = (layout: Layout[], layoutItem: Layout, _event: Event) => {
+    const event = _event as DragEvent;
+    const data = event.dataTransfer?.getData("application/json");
+    if (!data) return;
+
+    try {
+      const itemData = JSON.parse(data);
+      // Remove from dock
+      setDockItems(prev => prev.filter(i => i.id !== itemData.id));
+
+      const newLayoutId = `${itemData.id}-${Date.now()}`;
+
+      // Add to grid
+      setGridItems(prev => [...prev, { ...itemData, layoutId: newLayoutId }]);
+
+      // Update Layout
+      // The `layout` param passed to onDrop contains the new item with the calculated position
+      // We just need to ensure the ID matches and force correct settings
+      const newLayoutItem = {
+        ...layoutItem,
+        i: newLayoutId,
+        isResizable: false, // Disable resizing
+      };
+
+      setLayout(prev => [...prev, newLayoutItem]);
+
+    } catch (e) {
+      console.error("Failed to parse drop data", e);
+    }
+  };
+
+  const handleExport = async () => {
+    // Export functionality reset for reimplementation
+    console.log("Export Logic Cleared");
+    alert("Image export logic has been reset. Ready for new implementation.");
   };
 
   if (!mounted) return <div className="min-h-screen bg-gray-950 text-white flex items-center justify-center">Loading...</div>;
 
   return (
-    <main className="flex h-screen flex-col bg-gray-950 text-white overflow-hidden font-sans selection:bg-purple-500/30">
+    <main className="flex h-screen flex-col bg-stone-950 text-stone-200 overflow-hidden font-sans selection:bg-orange-500/30 relative">
       {/* Header */}
-      <header className="h-16 px-6 bg-gray-900/80 backdrop-blur-md border-b border-gray-800 flex justify-between items-center z-20 shadow-lg shrink-0">
-        <div className="flex items-center gap-4">
-          <div className="w-2 h-8 bg-gradient-to-b from-blue-500 to-purple-600 rounded-full"></div>
-          <h1 className="text-xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-blue-400 via-purple-400 to-pink-400">
-            {themeTitle}
-          </h1>
+      {/* Header */}
+      <header className="h-16 px-6 bg-stone-900/80 backdrop-blur-md border-b border-stone-800 flex justify-between items-center z-50 shadow-lg shrink-0 relative">
+        {/* Left: Logo Placeholder */}
+        <div className="flex items-center justify-center w-[88px] h-14 bg-stone-800 rounded-md border border-stone-700 overflow-hidden shrink-0 hover:border-stone-500 transition-colors cursor-pointer relative">
+          <span className="text-[10px] text-stone-500 font-bold">550x350</span>
         </div>
+
+        {/* Center: Theme Title (No Gradient, Clean) */}
+        <h1 className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 text-xl font-bold text-stone-100 tracking-wide">
+          {themeTitle}
+        </h1>
+
+        {/* Right: Export Button */}
         <div className="flex items-center gap-3">
-          <span className="px-3 py-1 bg-gray-800 rounded-full text-xs text-gray-400 border border-gray-700">
-            Drag & Drop
-          </span>
-          <span className="px-3 py-1 bg-gray-800 rounded-full text-xs text-gray-400 border border-gray-700">
-            Auto-Save: Off
-          </span>
+          <button
+            onClick={handleExport}
+            className="flex items-center gap-2 px-4 py-2 bg-stone-100 hover:bg-white text-stone-900 rounded-lg text-sm font-bold shadow-md hover:shadow-lg transition-all active:scale-95"
+          >
+            <Download size={16} />
+            Save Image
+          </button>
         </div>
       </header>
 
       {/* Main Content - Grid Area */}
       <div
-        className="flex-1 relative overflow-hidden flex flex-col"
-        style={{
-          backgroundImage: 'radial-gradient(#374151 1px, transparent 1px)',
-          backgroundSize: '24px 24px'
-        }}
+        className="flex-1 relative overflow-auto bg-stone-950 cursor-grab active:cursor-grabbing scrollbar-hide"
+        ref={gridContainerRef}
+        onMouseDown={handleMouseDown}
+        onMouseMove={handleMouseMove}
+        onMouseUp={handleMouseUp}
+        onMouseLeave={handleMouseUp}
+        style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }} // Hide Scrollbar
       >
-        <AnimeGrid
-          items={gridItems}
-          layouts={layouts}
-          onLayoutChange={handleLayoutChange}
-          onDrop={handleDrop as any}
-          onRemoveItem={handleRemoveItem}
-          axisLabels={axisLabels}
-        />
+        <div className="flex items-center justify-center min-w-full min-h-full">
+          <AnimeGrid
+            items={gridItems}
+            layout={layout}
+            onLayoutChange={handleLayoutChange}
+            onRemoveItem={handleRemoveItem}
+            axisLabels={axisLabels}
+            dockId="anime-dock"
+            isDockOpen={isDockOpen}
+            scale={zoomLevel} // Pass scale for RGL
+            onDrop={handleDrop}
+            droppingItem={{ i: '__dropping-elem__', w: DROP_SIZE.w, h: DROP_SIZE.h }}
+          />
+        </div>
       </div>
 
-      {/* Bottom Dock */}
-      <div className="h-48 z-30 shadow-[0_-10px_40px_rgba(0,0,0,0.5)] bg-gray-900/95 backdrop-blur-xl border-t border-gray-800 shrink-0">
-        <AnimeDock items={dockItems} />
+      {/* Zoom Controls */}
+      <div className="fixed top-24 right-8 flex flex-col gap-2 z-50">
+        <button
+          onClick={handleZoomIn}
+          className="p-2 bg-stone-800 text-stone-200 rounded-full shadow-lg hover:bg-stone-700 active:scale-95 transition-all border border-stone-700 disabled:opacity-50 disabled:cursor-not-allowed"
+          disabled={zoomLevel >= 1.5}
+        >
+          <Plus size={20} />
+        </button>
+        <div className="bg-stone-900/80 text-stone-400 text-xs font-bold py-1 px-2 rounded text-center backdrop-blur-md border border-stone-800 select-none">
+          {Math.round(zoomLevel * 100)}%
+        </div>
+        <button
+          onClick={handleZoomOut}
+          className="p-2 bg-stone-800 text-stone-200 rounded-full shadow-lg hover:bg-stone-700 active:scale-95 transition-all border border-stone-700 disabled:opacity-50 disabled:cursor-not-allowed"
+          disabled={zoomLevel <= 0.7}
+        >
+          <Minus size={20} />
+        </button>
+      </div>
+
+
+
+      {/* Bottom Dock - Floating Drawer */}
+      <div
+        id="anime-dock"
+        className={`fixed left-1/2 -translate-x-1/2 z-50 transition-all duration-500 ease-in-out
+          ${isDockOpen ? 'bottom-6' : '-bottom-[11rem]'} 
+          w-[95vw] md:w-[90vw] lg:w-[1400px] h-48`}
+      >
+        {/* Toggle Handle */}
+        {/* Toggle Handle - Moved to Right (Offset) and Larger */}
+        <button
+          onClick={() => setIsDockOpen(!isDockOpen)}
+          className="absolute -top-10 right-8 h-10 px-6 bg-gray-800/90 hover:bg-gray-700 backdrop-blur-md border border-gray-600/50 rounded-lg flex items-center justify-center gap-2 text-gray-400 hover:text-white transition-all shadow-[0_-5px_15px_rgba(0,0,0,0.3)] group z-50"
+        >
+          {isDockOpen ? <ChevronDown size={24} /> : <ChevronUp size={24} />}
+        </button>
+
+        {/* Dock Content */}
+        <div className="w-full h-full bg-gray-900/90 backdrop-blur-2xl border border-gray-700/50 shadow-2xl rounded-2xl overflow-hidden ring-1 ring-white/10">
+          <AnimeDock items={dockItems} />
+        </div>
       </div>
     </main>
   );
