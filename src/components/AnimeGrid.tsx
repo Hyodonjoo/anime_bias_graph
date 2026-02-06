@@ -4,7 +4,6 @@ import React, { useRef, useState, useEffect } from 'react';
 import Draggable, { DraggableEventHandler, DraggableData, DraggableEvent } from 'react-draggable';
 import { AnimeItem } from '@/lib/mockData';
 import Image from 'next/image';
-import { X } from 'lucide-react';
 import { Layout } from '@/types/layout';
 
 interface AnimeGridProps {
@@ -13,11 +12,11 @@ interface AnimeGridProps {
     onLayoutChange: (layout: Layout[]) => void;
     onRemoveItem: (id: string) => void;
     onDrop: (layout: Layout[], item: Layout, event: DragEvent) => void;
-    droppingItem?: { w: number; h: number; i: string }; // Not used for RGL anymore, but keeping for compatibility? We'll maintain similar signature.
     axisLabels: { top: string; bottom: string; left: string; right: string };
     dockId?: string;
     isDockOpen?: boolean;
     scale?: number;
+    onDragStateChange?: (isDragging: boolean) => void;
 }
 
 // Inner component to handle individual item drag state for performance
@@ -73,28 +72,14 @@ const DraggableGridItem = ({
         >
             <div
                 ref={nodeRef}
-                className="group absolute bg-gray-800 rounded-none border border-gray-700 overflow-hidden shadow-none hover:shadow-md transition-shadow cursor-move"
+                className="group absolute bg-gray-800 rounded-none border border-gray-700 overflow-hidden shadow-none hover:shadow-md transition-shadow cursor-move anime-grid-card"
                 style={{
                     width: '60px',
                     height: '60px',
-                    left: 0, // Draggable uses transform, so left/top should be 0 ideally or managed. 
-                    // Actually, Draggable applies transform. If we use position prop, we shouldn't set left/top unless using Position: absolute logic without transform. 
-                    // specific react-draggable behavior: it applies translate. So initial position is from 0,0 relative to parent.
-                    // Important: The element needs to be absolute for bounds="parent" to calculate correctly against a relative parent? 
-                    // "DraggableCore" vs "Draggable": Draggable adds styles.
+                    left: 0,
                     position: 'absolute'
                 }}
             >
-                <div className="absolute top-0 right-0 z-20 opacity-0 group-hover:opacity-100">
-                    <button
-                        onPointerDown={(e) => e.stopPropagation()} // Prevent drag start when clicking close
-                        onClick={(e) => { e.stopPropagation(); onRemove(item.layoutId); }}
-                        className="bg-red-500/80 text-white w-full h-full flex items-center justify-center hover:bg-red-600 rounded-bl-md"
-                        style={{ width: '20px', height: '20px' }}
-                    >
-                        <X size={12} />
-                    </button>
-                </div>
                 <div className="w-full h-full relative pointer-events-none"> {/* content pointer-events-none to let drag pass through easily? or just on image */}
                     <Image
                         src={item.imageUrl}
@@ -120,7 +105,7 @@ const collides = (r1: Layout, r2: Layout) => {
     );
 };
 
-export default function AnimeGrid({ items, layout, onLayoutChange, onRemoveItem, onDrop, axisLabels, dockId, isDockOpen, scale = 1 }: AnimeGridProps) {
+export default function AnimeGrid({ items, layout, onLayoutChange, onRemoveItem, onDrop, axisLabels, dockId, isDockOpen, scale = 1, onDragStateChange }: AnimeGridProps) {
     const [mounted, setMounted] = React.useState(false);
     const [draggingId, setDraggingId] = useState<string | null>(null);
     const containerRef = useRef<HTMLDivElement>(null);
@@ -167,21 +152,26 @@ export default function AnimeGrid({ items, layout, onLayoutChange, onRemoveItem,
 
     const handleItemDragStart = (id: string) => {
         setDraggingId(id);
+        if (onDragStateChange) onDragStateChange(true);
     };
 
     const handleItemDrag = (id: string, x: number, y: number) => {
+        // ... (existing logic)
         // Find current item
         const verifyItem = layout.find(l => l.i === id);
         if (!verifyItem) return;
 
         const movingItem = { ...verifyItem, x, y };
-        const newLayout = resolveLayout(layout, movingItem);
+        // Just update the moving item, do NOT resolve collisions for others during drag
+        const newLayout = layout.map(l => l.i === id ? movingItem : l);
 
         onLayoutChange(newLayout);
     };
 
     const handleItemDragStop = (id: string, x: number, y: number, e: DraggableEvent) => {
         setDraggingId(null);
+        if (onDragStateChange) onDragStateChange(false);
+        // ... (rest of simple logic: Dock removal check, final position sync)
 
         // Check for drop on Dock to remove
         if (dockId) {
@@ -210,6 +200,7 @@ export default function AnimeGrid({ items, layout, onLayoutChange, onRemoveItem,
                         clientY <= dockRect.bottom
                     ) {
                         onRemoveItem(id);
+                        if (onDragStateChange) onDragStateChange(false); // Ensure false if returning early
                         return;
                     }
                 }
@@ -236,15 +227,8 @@ export default function AnimeGrid({ items, layout, onLayoutChange, onRemoveItem,
         const rect = containerRef.current.getBoundingClientRect();
 
         // Calculate position relative to the container, accounting for scale
-        // x_scaled = (clientX - left) / scale
         const x = (e.clientX - rect.left) / scale;
         const y = (e.clientY - rect.top) / scale;
-
-        // Create a layout item with pixel coordinates
-        // Centering the 60x60 item on the mouse? 
-        // Mouse is usually at top-left of dragged ghost? Or where user grabbed.
-        // Let's center it for better UX, or just use click position as top-left.
-        // Using top-left is standard for "drop coords".
 
         const layoutItem: Layout = {
             i: '__dropping_elem__', // handled by parent
@@ -256,52 +240,11 @@ export default function AnimeGrid({ items, layout, onLayoutChange, onRemoveItem,
 
         if (onDrop) {
             // Pre-resolve collision for the dropped item
-            // We need to merge the temp item into current layout to check collisions, 
-            // then pass the CLEAN layout + New Item to parent
-
-            // Wait, onDrop expects the final layout including the new item?
-            // Usually parent adds it. 
-            // We can locally calculate the valid position?
-
-            // Let's just pass the item. The user's code in page.tsx adds it to layout.
-            // But page.tsx is dumb. It just appends.
-            // We should arguably return a "Clean Layout" suggestion.
-            // But strict signature: onDrop(layout, item, event).
-
-            // Let's run the resolver on the hypothetical layout
             const prospectiveLayout = [...layout, layoutItem];
             const resolvedLayout = resolveLayout(prospectiveLayout, layoutItem);
 
-            // Pass this resolved layout to parent?
-            // The parent `handleDrop` calls `setLayout([...prev, newItem])`.
-            // If we pass `resolvedLayout` as the first arg, does it use it? 
-            // Parent: `const handleDrop = (layout: Layout[], ...)` -> checks `layout`.
-            // Currently parent implementation: `setLayout(prev => [...prev, newLayoutItem])`.
-            // It completely IGNORES the first argument `layout` currently in page.tsx! 
-            // It uses `prev` state of layout.
-            // So we need to fix page.tsx? OR just fix it here by passing correct `layoutItem`?
-
-            // If we fix `layoutItem` to include the pushed Y, that solves collision with the new item,
-            // BUT it doesn't solve if we pushed *others* to make space.
-
-            // Since we can't easily force parent logic change from here without editing page.tsx,
-            // we will just rely on the user dragging it afterwards or initial placement being rough.
-            // HOWEVER, the user asked for "Drop" behavior too.
-            // The best hook is: We perform the calculation, find the "Safe Spot" (maybe pushed down others?), 
-            // AND we update `layout` prop immediately? No, `onLayoutChange` might be better.
-
-            // Let's CALL `onLayoutChange` with the displaced items excluding the new one?
-            // No, the new item isn't in `layout` yet.
-
-            // For now, let's just emit the drop. The user can drag to fix.
-            // Or better: Simulate drag once immediately after mount?
-            // Let's leave Drop basic for now, provided Drag fixes it. 
-            // If needed we can refactor `handleDrop` in page.tsx later.
-
-            // Actually, we can just pass the `layoutItem` but with updated Y?
-            // No, because existing items might need to move.
-
-            onDrop(layout, layoutItem, e.nativeEvent as DragEvent);
+            // Pass the FULL resolved layout (including pushed items) to parent
+            onDrop(resolvedLayout, layoutItem, e.nativeEvent as DragEvent);
         }
     };
 

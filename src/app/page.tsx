@@ -6,7 +6,7 @@ import AnimeGrid from '@/components/AnimeGrid';
 import AnimeDock from '@/components/AnimeDock';
 import { AnimeItem } from '@/lib/mockData';
 import { supabase } from '@/lib/supabase';
-import { ChevronUp, ChevronDown, X, Download, Plus, Minus } from 'lucide-react';
+import { ChevronUp, ChevronDown, Download, Plus, Minus } from 'lucide-react';
 
 export default function Home() {
   const [themeTitle, setThemeTitle] = useState('');
@@ -16,8 +16,7 @@ export default function Home() {
   const [isDockOpen, setIsDockOpen] = useState(true);
   const [zoomLevel, setZoomLevel] = useState(1); // 1 = 100%
 
-  // Configuration for dropped item size (pixels)
-  const DROP_SIZE = { w: 60, h: 60 };
+
 
   const handleZoomIn = () => setZoomLevel(prev => Math.min(prev + 0.1, 1.5));
   const handleZoomOut = () => setZoomLevel(prev => Math.max(prev - 0.1, 0.7));
@@ -25,15 +24,24 @@ export default function Home() {
   // Fixed layout state instead of responsive breakpoints
   const [layout, setLayout] = useState<Layout[]>([]);
   const [mounted, setMounted] = useState(false);
+  const [isItemDragging, setIsItemDragging] = useState(false); // Add dragging state
+  const [themeId, setThemeId] = useState<string | null>(null); // Track Theme ID for saving
 
   // Drag to Scroll Refs
   const gridContainerRef = useRef<HTMLDivElement>(null);
+  // ... (rest of refs)
+
   const isPanningRef = useRef(false);
   const startPosRef = useRef({ x: 0, y: 0 });
   const scrollPosRef = useRef({ left: 0, top: 0 });
 
   const handleMouseDown = (e: React.MouseEvent) => {
     if (!gridContainerRef.current) return;
+
+    // Check if we clicked on a card or associated UI (resize handle, button, etc)
+    // If so, do NOT start panning the grid.
+    if ((e.target as HTMLElement).closest('.anime-grid-card') || (e.target as HTMLElement).closest('.react-resizable-handle')) return;
+
     // Allow default interaction (e.g. text selection or clicking buttons) unless it's the specific background
     // But since we want "Drag Map", usually background drag is intended.
     isPanningRef.current = true;
@@ -79,6 +87,20 @@ export default function Home() {
     fetchActiveTheme();
   }, []);
 
+  // Auto-save to LocalStorage whenever state changes
+  useEffect(() => {
+    if (!mounted || !themeId) return;
+
+    const saveData = {
+      gridItems,
+      layout,
+      dockItems
+    };
+
+    localStorage.setItem(`animebias_save_${themeId}`, JSON.stringify(saveData));
+  }, [gridItems, layout, dockItems, themeId, mounted]);
+
+
   const fetchActiveTheme = async () => {
     try {
       const { data: themes, error } = await supabase
@@ -92,6 +114,7 @@ export default function Home() {
         return;
       }
 
+      setThemeId(themes.id);
       setThemeTitle(themes.title);
       setAxisLabels({
         top: themes.axis_top,
@@ -100,7 +123,26 @@ export default function Home() {
         right: themes.axis_right
       });
 
-      // Fetch anime items for this theme
+      // Check for local save first
+      const saveKey = `animebias_save_${themes.id}`;
+      const savedDataString = localStorage.getItem(saveKey);
+
+      if (savedDataString) {
+        try {
+          const savedData = JSON.parse(savedDataString);
+          if (savedData.gridItems && savedData.layout && savedData.dockItems) {
+            console.log("Loaded state from LocalStorage");
+            setGridItems(savedData.gridItems);
+            setLayout(savedData.layout);
+            setDockItems(savedData.dockItems);
+            return; // Skip DB fetch if local save exists
+          }
+        } catch (e) {
+          console.error("Failed to parse local save, falling back to DB", e);
+        }
+      }
+
+      // If no save, Fetch anime items for this theme from DB
       const { data: animeItems } = await supabase
         .from('anime_items')
         .select('*')
@@ -135,7 +177,7 @@ export default function Home() {
     setLayout(prev => prev.filter(l => (l as any).i !== id));
   };
 
-  const handleDrop = (layout: Layout[], layoutItem: Layout, _event: Event) => {
+  const handleDrop = (resolvedLayout: Layout[], layoutItem: Layout, _event: Event) => {
     const event = _event as DragEvent;
     const data = event.dataTransfer?.getData("application/json");
     if (!data) return;
@@ -147,19 +189,19 @@ export default function Home() {
 
       const newLayoutId = `${itemData.id}-${Date.now()}`;
 
-      // Add to grid
+      // Add to grid items
       setGridItems(prev => [...prev, { ...itemData, layoutId: newLayoutId }]);
 
-      // Update Layout
-      // The `layout` param passed to onDrop contains the new item with the calculated position
-      // We just need to ensure the ID matches and force correct settings
-      const newLayoutItem = {
-        ...layoutItem,
-        i: newLayoutId,
-        isResizable: false, // Disable resizing
-      };
+      // Update Layout with the RESOLVED positions from AnimeGrid
+      // We need to find the Item with temp ID and replace it with real ID
+      const finalLayout = resolvedLayout.map(l => {
+        if (l.i === '__dropping_elem__') {
+          return { ...l, i: newLayoutId, isResizable: false };
+        }
+        return l;
+      });
 
-      setLayout(prev => [...prev, newLayoutItem]);
+      setLayout(finalLayout);
 
     } catch (e) {
       console.error("Failed to parse drop data", e);
@@ -176,7 +218,6 @@ export default function Home() {
 
   return (
     <main className="flex h-screen flex-col bg-stone-950 text-stone-200 overflow-hidden font-sans selection:bg-orange-500/30 relative">
-      {/* Header */}
       {/* Header */}
       <header className="h-16 px-6 bg-stone-900/80 backdrop-blur-md border-b border-stone-800 flex justify-between items-center z-50 shadow-lg shrink-0 relative">
         {/* Left: Logo Placeholder */}
@@ -203,7 +244,7 @@ export default function Home() {
 
       {/* Main Content - Grid Area */}
       <div
-        className="flex-1 relative overflow-auto bg-stone-950 cursor-grab active:cursor-grabbing scrollbar-hide"
+        className={`flex-1 relative bg-stone-950 cursor-grab active:cursor-grabbing scrollbar-hide ${isItemDragging ? 'overflow-hidden' : 'overflow-auto'}`}
         ref={gridContainerRef}
         onMouseDown={handleMouseDown}
         onMouseMove={handleMouseMove}
@@ -222,7 +263,7 @@ export default function Home() {
             isDockOpen={isDockOpen}
             scale={zoomLevel} // Pass scale for RGL
             onDrop={handleDrop}
-            droppingItem={{ i: '__dropping-elem__', w: DROP_SIZE.w, h: DROP_SIZE.h }}
+            onDragStateChange={setIsItemDragging}
           />
         </div>
       </div>
