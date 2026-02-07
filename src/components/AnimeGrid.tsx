@@ -17,6 +17,7 @@ interface AnimeGridProps {
     isDockOpen?: boolean;
     scale?: number;
     onDragStateChange?: (isDragging: boolean) => void;
+    onUpdateTag?: (id: string, tag: string) => void;
 }
 
 // Inner component to handle individual item drag state for performance
@@ -27,7 +28,8 @@ const DraggableGridItem = ({
     onStop,
     onRemove,
     scale,
-    isDragging
+    isDragging,
+    onUpdateTag
 }: {
     item: AnimeItem & { layoutId: string };
     layoutItem: Layout;
@@ -36,10 +38,20 @@ const DraggableGridItem = ({
     onRemove: (id: string) => void;
     scale: number;
     isDragging: boolean;
+    onUpdateTag?: (id: string, tag: string) => void;
 }) => {
-    // Local state for smooth dragging without updating parent constantly
+    // Local state for smooth dragging without dragging parent constantly
     const [position, setPosition] = useState({ x: layoutItem.x, y: layoutItem.y });
     const nodeRef = useRef(null);
+    const [isEditingTag, setIsEditingTag] = useState(false);
+    const [tagInput, setTagInput] = useState(item.tag || '');
+    const inputRef = useRef<HTMLInputElement>(null);
+
+    useEffect(() => {
+        if (isEditingTag && inputRef.current) {
+            inputRef.current.focus();
+        }
+    }, [isEditingTag]);
 
     // Sync if parent updates layout (e.g. from DB load or PUSH effect)
     // IMPORTANT: Do NOT sync if this item is currently being dragged by the user,
@@ -60,6 +72,31 @@ const DraggableGridItem = ({
         onStop(item.layoutId, data.x, data.y, e);
     };
 
+    const handleStartEdit = (e: React.MouseEvent) => {
+        e.stopPropagation();
+        e.preventDefault();
+        if (!onUpdateTag) return;
+        setTagInput(item.tag || '');
+        setIsEditingTag(true);
+    };
+
+    const handleTagSubmit = () => {
+        setIsEditingTag(false);
+        if (onUpdateTag) {
+            onUpdateTag(item.layoutId, tagInput.trim());
+        }
+    };
+
+    const handleTagKeyDown = (e: React.KeyboardEvent) => {
+        e.stopPropagation();
+        if (e.key === 'Enter') {
+            handleTagSubmit();
+        } else if (e.key === 'Escape') {
+            setIsEditingTag(false);
+            setTagInput(item.tag || '');
+        }
+    };
+
     return (
         <Draggable
             nodeRef={nodeRef}
@@ -72,7 +109,7 @@ const DraggableGridItem = ({
         >
             <div
                 ref={nodeRef}
-                className="group absolute bg-gray-800 rounded-none border border-gray-700 overflow-hidden shadow-none hover:shadow-md transition-shadow cursor-move anime-grid-card"
+                className="group absolute bg-gray-800 rounded-none border border-gray-700 overflow-visible shadow-none hover:shadow-md transition-shadow cursor-move anime-grid-card"
                 style={{
                     width: '60px',
                     height: '60px',
@@ -80,7 +117,7 @@ const DraggableGridItem = ({
                     position: 'absolute'
                 }}
             >
-                <div className="w-full h-full relative pointer-events-none"> {/* content pointer-events-none to let drag pass through easily? or just on image */}
+                <div className="w-full h-full relative pointer-events-none">
                     <Image
                         src={item.imageUrl}
                         alt={item.title}
@@ -89,6 +126,41 @@ const DraggableGridItem = ({
                         className="object-cover"
                         sizes="60px"
                     />
+                </div>
+
+                {/* Tag Display / Editor */}
+                {isEditingTag ? (
+                    <div className="absolute -bottom-8 left-1/2 -translate-x-1/2 z-[60]">
+                        <input
+                            ref={inputRef}
+                            type="text"
+                            value={tagInput}
+                            onChange={(e) => setTagInput(e.target.value)}
+                            maxLength={12}
+                            onBlur={handleTagSubmit}
+                            onKeyDown={handleTagKeyDown}
+                            onMouseDown={(e) => e.stopPropagation()}
+                            className="bg-black/90 text-white text-[10px] px-2 py-1 rounded border border-blue-500 outline-none text-center w-24 shadow-lg"
+                            placeholder="Tag..."
+                        />
+                    </div>
+                ) : (
+                    item.tag && (
+                        <div className="absolute -bottom-6 left-1/2 -translate-x-1/2 bg-black/80 text-white text-[10px] px-1.5 py-0.5 rounded whitespace-nowrap z-50 pointer-events-none shadow-sm">
+                            {item.tag}
+                        </div>
+                    )
+                )}
+
+                {/* Edit Tag Button - Top Right */}
+                <div
+                    onClick={handleStartEdit}
+                    className="absolute -top-2 -right-2 w-5 h-5 bg-blue-500 hover:bg-blue-400 text-white rounded-full flex items-center justify-center cursor-pointer opacity-0 group-hover:opacity-100 transition-opacity shadow-sm z-50"
+                    title="Edit Tag"
+                >
+                    <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"></path>
+                    </svg>
                 </div>
             </div>
         </Draggable>
@@ -105,7 +177,7 @@ const collides = (r1: Layout, r2: Layout) => {
     );
 };
 
-export default function AnimeGrid({ items, layout, onLayoutChange, onRemoveItem, onDrop, axisLabels, dockId, isDockOpen, scale = 1, onDragStateChange }: AnimeGridProps) {
+export default function AnimeGrid({ items, layout, onLayoutChange, onRemoveItem, onDrop, axisLabels, dockId, isDockOpen, scale = 1, onDragStateChange, onUpdateTag }: AnimeGridProps) {
     const [mounted, setMounted] = React.useState(false);
     const [draggingId, setDraggingId] = useState<string | null>(null);
     const containerRef = useRef<HTMLDivElement>(null);
@@ -330,6 +402,7 @@ export default function AnimeGrid({ items, layout, onLayoutChange, onRemoveItem,
                             onRemove={onRemoveItem}
                             scale={scale}
                             isDragging={draggingId === item.layoutId}
+                            onUpdateTag={onUpdateTag}
                         />
                     );
                 })}

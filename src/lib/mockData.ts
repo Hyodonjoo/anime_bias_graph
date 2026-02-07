@@ -3,6 +3,7 @@ export interface AnimeItem {
     title: string;
     imageUrl: string;
     year: number;
+    tag?: string;
 }
 
 export const MOCK_THEME = "2024년 4분기 애니메이션 결산 (2024 Winter Anime)";

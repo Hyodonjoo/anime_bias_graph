@@ -172,9 +172,18 @@ export default function Home() {
     const itemToRemove = gridItems.find(i => i.layoutId === id);
     if (!itemToRemove) return;
 
+    // Remove the tag when returning to dock
+    const { tag, ...cleanedItem } = itemToRemove;
+
     setGridItems(prev => prev.filter(i => i.layoutId !== id));
-    setDockItems(prev => [...prev, itemToRemove]);
+    setDockItems(prev => [...prev, cleanedItem]);
     setLayout(prev => prev.filter(l => (l as any).i !== id));
+  };
+
+  const handleUpdateTag = (layoutId: string, tag: string) => {
+    setGridItems(prev => prev.map(item =>
+      item.layoutId === layoutId ? { ...item, tag } : item
+    ));
   };
 
   const handleDrop = (resolvedLayout: Layout[], layoutItem: Layout, _event: Event) => {
@@ -264,6 +273,7 @@ export default function Home() {
             scale={zoomLevel} // Pass scale for RGL
             onDrop={handleDrop}
             onDragStateChange={setIsItemDragging}
+            onUpdateTag={handleUpdateTag}
           />
         </div>
       </div>
