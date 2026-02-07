@@ -7,6 +7,7 @@ import AnimeDock from '@/components/AnimeDock';
 import { AnimeItem } from '@/lib/mockData';
 import { supabase } from '@/lib/supabase';
 import { ChevronUp, ChevronDown, Download, Plus, Minus } from 'lucide-react';
+import { toCanvas } from 'html-to-image';
 
 export default function Home() {
   const [themeTitle, setThemeTitle] = useState('');
@@ -218,9 +219,206 @@ export default function Home() {
   };
 
   const handleExport = async () => {
-    // Export functionality reset for reimplementation
-    console.log("Export Logic Cleared");
-    alert("Image export logic has been reset. Ready for new implementation.");
+    try {
+      const canvas = document.createElement('canvas');
+      const ctx = canvas.getContext('2d');
+      if (!ctx) return;
+
+      // Canvas Settings
+      const GRID_SIZE = 1000;
+      const HEADER_HEIGHT = 150;
+      const WIDTH = 1000;
+      const HEIGHT = GRID_SIZE + HEADER_HEIGHT; // 1150px
+
+      canvas.width = WIDTH;
+      canvas.height = HEIGHT;
+
+      // 1. Background
+      ctx.fillStyle = '#0c0a09'; // stone-950
+      ctx.fillRect(0, 0, WIDTH, HEIGHT);
+
+      // 2. Title
+      ctx.fillStyle = '#ffffff';
+      ctx.font = '800 48px sans-serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      // Add subtle text shadow
+      ctx.shadowColor = 'rgba(0, 0, 0, 0.8)';
+      ctx.shadowBlur = 8;
+      ctx.shadowOffsetY = 4;
+      ctx.fillText((themeTitle || 'ANIME GRID').toUpperCase(), WIDTH / 2, HEADER_HEIGHT / 2);
+      ctx.shadowColor = 'transparent'; // Reset shadow
+
+      // 3. Grid Area Offset
+      ctx.translate(0, HEADER_HEIGHT);
+
+      // Clip to grid area for safety
+      ctx.beginPath();
+      ctx.rect(0, 0, GRID_SIZE, GRID_SIZE);
+      ctx.clip();
+
+      // 4. Draw Grid Lines (Background visual)
+      ctx.strokeStyle = 'rgba(75, 85, 99, 0.3)'; // gray-600/30
+      ctx.lineWidth = 1;
+
+      const CELL_SIZE = 20;
+
+      for (let i = 0; i <= GRID_SIZE; i += CELL_SIZE) {
+        // Vertical
+        ctx.beginPath();
+        ctx.moveTo(i, 0);
+        ctx.lineTo(i, GRID_SIZE);
+        ctx.stroke();
+
+        // Horizontal
+        ctx.beginPath();
+        ctx.moveTo(0, i);
+        ctx.lineTo(GRID_SIZE, i);
+        ctx.stroke();
+      }
+
+      // 5. Draw Axis Lines (Blue Center Lines)
+      ctx.strokeStyle = 'rgba(96, 165, 250, 0.8)'; // blue-400/80
+      ctx.lineWidth = 2;
+      ctx.shadowColor = 'rgba(96, 165, 250, 0.5)';
+      ctx.shadowBlur = 10;
+
+      // Vertical Axis
+      ctx.beginPath();
+      ctx.moveTo(GRID_SIZE / 2, 0);
+      ctx.lineTo(GRID_SIZE / 2, GRID_SIZE);
+      ctx.stroke();
+
+      // Horizontal Axis
+      ctx.beginPath();
+      ctx.moveTo(0, GRID_SIZE / 2);
+      ctx.lineTo(GRID_SIZE, GRID_SIZE / 2);
+      ctx.stroke();
+
+      ctx.shadowColor = 'transparent';
+
+      // 6. Draw Anime Items
+      // We need to load images first.
+      const imageLoadPromises = gridItems.map(async (item) => {
+        const layoutItem = layout.find(l => l.i === item.layoutId);
+        if (!layoutItem) return;
+
+        const img = new Image();
+        img.crossOrigin = 'anonymous'; // Crucial for CORS
+        img.src = item.imageUrl;
+
+        await new Promise((resolve, reject) => {
+          img.onload = resolve;
+          img.onerror = () => {
+            console.warn(`Failed to load image for ${item.title}`);
+            resolve(null); // Resolve anyway to continue
+          };
+        });
+
+        return { img, x: layoutItem.x, y: layoutItem.y, title: item.title, tag: item.tag };
+      });
+
+      const loadedImages = await Promise.all(imageLoadPromises);
+
+      // Draw images in order
+      loadedImages.forEach(data => {
+        if (!data) return;
+        const { img, x, y, tag } = data;
+        const ITEM_SIZE = 60; // 60px fixed
+
+        // Save context for clipping rounded corners (if any) - currently square in design
+        // But let's add a small border/shadow like the CSS
+
+        // Shadow/Glow
+        // ctx.shadowColor = 'rgba(0,0,0,0.5)';
+        // ctx.shadowBlur = 4;
+        // ctx.fillRect(x, y, ITEM_SIZE, ITEM_SIZE);
+        // ctx.shadowColor = 'transparent';
+
+        // Draw Image
+        try {
+          ctx.drawImage(img, x, y, ITEM_SIZE, ITEM_SIZE);
+        } catch (e) {
+          // Fallback color if image fails to draw (rare if onload passed)
+          ctx.fillStyle = '#333';
+          ctx.fillRect(x, y, ITEM_SIZE, ITEM_SIZE);
+        }
+
+        // Border
+        ctx.strokeStyle = '#374151'; // gray-700
+        ctx.lineWidth = 1;
+        ctx.strokeRect(x, y, ITEM_SIZE, ITEM_SIZE);
+
+        // Draw Tag if exists
+        if (tag) {
+          ctx.font = '10px sans-serif';
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'top';
+
+          const textWidth = ctx.measureText(tag).width;
+          const padding = 4;
+          const tagX = x + ITEM_SIZE / 2;
+          const tagY = y + ITEM_SIZE - 5; // Slightly overlapping bottom
+
+          // Tag Background
+          ctx.fillStyle = 'rgba(0, 0, 0, 0.8)';
+          // Round rect approx
+          ctx.fillRect(tagX - textWidth / 2 - padding, tagY, textWidth + padding * 2, 14);
+
+          // Tag Text
+          ctx.fillStyle = '#ffffff';
+          ctx.fillText(tag, tagX, tagY + 2);
+        }
+      });
+
+      // 7. Draw Axis Labels (Top, Bottom, Left, Right)
+      // Reset Shadow
+      ctx.shadowColor = 'transparent';
+      ctx.font = 'bold 14px sans-serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+
+      // Helper to draw label pill
+      const drawLabel = (text: string, x: number, y: number) => {
+        if (!text) return;
+        const width = ctx.measureText(text).width + 24;
+        const height = 28;
+
+        // Pill Background
+        ctx.fillStyle = 'rgba(17, 24, 39, 0.9)'; // gray-900/90
+        ctx.strokeStyle = '#374151'; // gray-700
+
+        // Pill Shape
+        ctx.beginPath();
+        ctx.roundRect(x - width / 2, y - height / 2, width, height, 14);
+        ctx.fill();
+        ctx.stroke();
+
+        // Text
+        ctx.fillStyle = '#9ca3af'; // gray-400
+        ctx.fillText(text, x, y);
+      };
+
+      // Top
+      drawLabel(`${axisLabels.top} ▲`, GRID_SIZE / 2, 20);
+      // Bottom
+      drawLabel(`▼ ${axisLabels.bottom}`, GRID_SIZE / 2, GRID_SIZE - 20);
+      // Left
+      drawLabel(`◀ ${axisLabels.left}`, 60, GRID_SIZE / 2); // approximate nice position
+      // Right
+      drawLabel(`${axisLabels.right} ▶`, GRID_SIZE - 60, GRID_SIZE / 2);
+
+      // 8. Export
+      const dataUrl = canvas.toDataURL('image/webp', 1.0);
+      const link = document.createElement('a');
+      link.download = `${themeTitle ? themeTitle.replace(/\s+/g, '_') : 'anime_bias_grid'}.webp`;
+      link.href = dataUrl;
+      link.click();
+
+    } catch (err) {
+      console.error('Export failed:', err);
+      alert('이미지 저장 중 오류가 발생했습니다.');
+    }
   };
 
   if (!mounted) return <div className="min-h-screen bg-gray-950 text-white flex items-center justify-center">Loading...</div>;

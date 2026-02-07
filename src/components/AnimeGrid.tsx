@@ -18,6 +18,7 @@ interface AnimeGridProps {
     scale?: number;
     onDragStateChange?: (isDragging: boolean) => void;
     onUpdateTag?: (id: string, tag: string) => void;
+    isExport?: boolean;
 }
 
 // Inner component to handle individual item drag state for performance
@@ -29,7 +30,8 @@ const DraggableGridItem = ({
     onRemove,
     scale,
     isDragging,
-    onUpdateTag
+    onUpdateTag,
+    isExport
 }: {
     item: AnimeItem & { layoutId: string };
     layoutItem: Layout;
@@ -39,6 +41,7 @@ const DraggableGridItem = ({
     scale: number;
     isDragging: boolean;
     onUpdateTag?: (id: string, tag: string) => void;
+    isExport?: boolean;
 }) => {
     // Local state for smooth dragging without dragging parent constantly
     const [position, setPosition] = useState({ x: layoutItem.x, y: layoutItem.y });
@@ -63,16 +66,19 @@ const DraggableGridItem = ({
     }, [layoutItem.x, layoutItem.y, isDragging]);
 
     const handleDrag: DraggableEventHandler = (e, data) => {
+        if (isExport) return;
         setPosition({ x: data.x, y: data.y });
         onDrag(item.layoutId, data.x, data.y);
     };
 
     const handleStop: DraggableEventHandler = (e, data) => {
+        if (isExport) return;
         setPosition({ x: data.x, y: data.y });
         onStop(item.layoutId, data.x, data.y, e);
     };
 
     const handleStartEdit = (e: React.MouseEvent) => {
+        if (isExport) return;
         e.stopPropagation();
         e.preventDefault();
         if (!onUpdateTag) return;
@@ -105,11 +111,12 @@ const DraggableGridItem = ({
             onStop={handleStop}
             scale={scale}
             bounds="parent" // Constraint to grid area
+            disabled={isExport}
         // grid={[20, 20]} // Optional: Enable if user wants snapping. Commented out for "Free Drag".
         >
             <div
                 ref={nodeRef}
-                className="group absolute bg-gray-800 rounded-none border border-gray-700 overflow-visible shadow-none hover:shadow-md transition-shadow cursor-move anime-grid-card"
+                className={`group absolute bg-gray-800 rounded-none border border-gray-700 overflow-visible shadow-none ${isExport ? '' : 'hover:shadow-md cursor-move'} transition-shadow anime-grid-card`}
                 style={{
                     width: '60px',
                     height: '60px',
@@ -152,16 +159,18 @@ const DraggableGridItem = ({
                     )
                 )}
 
-                {/* Edit Tag Button - Top Right */}
-                <div
-                    onClick={handleStartEdit}
-                    className="absolute -top-2 -right-2 w-5 h-5 bg-blue-500 hover:bg-blue-400 text-white rounded-full flex items-center justify-center cursor-pointer opacity-0 group-hover:opacity-100 transition-opacity shadow-sm z-50"
-                    title="Edit Tag"
-                >
-                    <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
-                        <path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"></path>
-                    </svg>
-                </div>
+                {/* Edit Tag Button - Top Right - Hide in Export */}
+                {!isExport && (
+                    <div
+                        onClick={handleStartEdit}
+                        className="absolute -top-2 -right-2 w-5 h-5 bg-blue-500 hover:bg-blue-400 text-white rounded-full flex items-center justify-center cursor-pointer opacity-0 group-hover:opacity-100 transition-opacity shadow-sm z-50"
+                        title="Edit Tag"
+                    >
+                        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                            <path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"></path>
+                        </svg>
+                    </div>
+                )}
             </div>
         </Draggable>
     );
@@ -177,7 +186,7 @@ const collides = (r1: Layout, r2: Layout) => {
     );
 };
 
-export default function AnimeGrid({ items, layout, onLayoutChange, onRemoveItem, onDrop, axisLabels, dockId, isDockOpen, scale = 1, onDragStateChange, onUpdateTag }: AnimeGridProps) {
+export default function AnimeGrid({ items, layout, onLayoutChange, onRemoveItem, onDrop, axisLabels, dockId, isDockOpen, scale = 1, onDragStateChange, onUpdateTag, isExport = false }: AnimeGridProps) {
     const [mounted, setMounted] = React.useState(false);
     const [draggingId, setDraggingId] = useState<string | null>(null);
     const containerRef = useRef<HTMLDivElement>(null);
@@ -293,6 +302,7 @@ export default function AnimeGrid({ items, layout, onLayoutChange, onRemoveItem,
     };
 
     const handleDropInternal = (e: React.DragEvent) => {
+        if (isExport) return;
         e.preventDefault();
         if (!containerRef.current) return;
 
@@ -334,14 +344,16 @@ export default function AnimeGrid({ items, layout, onLayoutChange, onRemoveItem,
     return (
         <div
             ref={containerRef}
-            id="anime-grid-content"
-            className="relative group/grid flex flex-col justify-between"
+            id={isExport ? "anime-grid-export" : "anime-grid-content"} // Different ID for export
+            className={`relative flex flex-col justify-between ${isExport ? '' : 'group/grid'}`}
             onDragOver={handleDragOver}
             onDrop={handleDropInternal}
             style={{
-                width: `${1000 * scale}px`,
-                height: `${1000 * scale}px`,
-                backgroundColor: 'rgba(17, 24, 39, 0.5)'
+                width: '1000px', // Fixed size
+                height: '1000px',
+                // Use scale 1 for export, otherwise props
+                transform: isExport ? 'none' : undefined,
+                backgroundColor: isExport ? '#0c0a09' : 'rgba(17, 24, 39, 0.5)' // Solid black for export, trans for UI
             }}
         >
             {/* Visual Content Layer - Scaled (Absolute Background) */}
@@ -350,12 +362,14 @@ export default function AnimeGrid({ items, layout, onLayoutChange, onRemoveItem,
                 style={{
                     width: '1000px',
                     height: '1000px',
-                    transform: `scale(${scale})`,
+                    // Force scale 1 for export
+                    transform: isExport ? 'none' : `scale(${scale})`,
                     backgroundImage: `
                         linear-gradient(to right, rgba(75, 85, 99, 0.3) 1px, transparent 1px),
                         linear-gradient(to bottom, rgba(75, 85, 99, 0.3) 1px, transparent 1px)
                     `,
                     backgroundSize: '20px 20px',
+                    backgroundPosition: '0 0'
                 }}
             >
                 {/* Axis Lines & Origin */}
@@ -388,7 +402,7 @@ export default function AnimeGrid({ items, layout, onLayoutChange, onRemoveItem,
 
             {/* Interactive Grid Items Layer - Separate from visual background but scaled same way */}
             <div className="absolute inset-0 z-10 pointer-events-auto origin-top-left"
-                style={{ width: '1000px', height: '1000px', transform: `scale(${scale})` }}>
+                style={{ width: '1000px', height: '1000px', transform: isExport ? 'none' : `scale(${scale})` }}>
                 {items.map((item) => {
                     const layoutItem = layout.find(l => l.i === item.layoutId);
                     if (!layoutItem) return null;
@@ -400,51 +414,79 @@ export default function AnimeGrid({ items, layout, onLayoutChange, onRemoveItem,
                             onDrag={handleItemDrag}
                             onStop={handleItemDragStop}
                             onRemove={onRemoveItem}
-                            scale={scale}
+                            scale={isExport ? 1 : scale}
                             isDragging={draggingId === item.layoutId}
                             onUpdateTag={onUpdateTag}
+                            isExport={isExport}
                         />
                     );
                 })}
             </div>
 
-            {/* Labels Layer (Flex Layout for correct stickiness) */}
+            {/* Labels Layer (Flex Layout for correct stickiness) - Hide during export if desired, or keep fixed */}
+            {/* For export, we likely want simple absolute centering since scrolling is gone */}
+            {isExport ? (
+                <>
+                    <div className="absolute top-4 left-1/2 -translate-x-1/2 z-50">
+                        <span className="font-bold text-gray-400 bg-gray-900/90 px-3 py-1 rounded-full border border-gray-700 shadow-lg whitespace-nowrap">
+                            {axisLabels.top} ▲
+                        </span>
+                    </div>
+                    <div className="absolute left-4 top-1/2 -translate-y-1/2 z-50">
+                        <span className="block font-bold text-gray-400 bg-gray-900/90 px-3 py-1 rounded-full border border-gray-700 shadow-lg whitespace-nowrap">
+                            ◀ {axisLabels.left}
+                        </span>
+                    </div>
+                    <div className="absolute right-4 top-1/2 -translate-y-1/2 z-50">
+                        <span className="block font-bold text-gray-400 bg-gray-900/90 px-3 py-1 rounded-full border border-gray-700 shadow-lg whitespace-nowrap">
+                            {axisLabels.right} ▶
+                        </span>
+                    </div>
+                    <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-50">
+                        <span className="font-bold text-gray-400 bg-gray-900/90 px-3 py-1 rounded-full border border-gray-700 shadow-lg whitespace-nowrap">
+                            ▼ {axisLabels.bottom}
+                        </span>
+                    </div>
+                </>
+            ) : (
+                <>
+                    {/* Top */}
+                    <div className="sticky top-4 z-50 self-center pointer-events-none">
+                        <span className="font-bold text-gray-400 bg-gray-900/90 px-3 py-1 rounded-full border border-gray-700 shadow-lg backdrop-blur-sm whitespace-nowrap">
+                            {axisLabels.top} ▲
+                        </span>
+                    </div>
 
-            {/* Top */}
-            <div className="sticky top-4 z-50 self-center pointer-events-none">
-                <span className="font-bold text-gray-400 bg-gray-900/90 px-3 py-1 rounded-full border border-gray-700 shadow-lg backdrop-blur-sm whitespace-nowrap">
-                    {axisLabels.top} ▲
-                </span>
-            </div>
+                    {/* Middle (Left/Right) */}
+                    <div className="flex-1 w-full flex justify-between items-start px-4 z-50 pointer-events-none">
+                        {/* Left */}
+                        <div className="sticky left-4 top-1/2 -translate-y-1/2">
+                            <span className="block font-bold text-gray-400 bg-gray-900/90 px-3 py-1 rounded-full border border-gray-700 shadow-lg backdrop-blur-sm whitespace-nowrap">
+                                ◀ {axisLabels.left}
+                            </span>
+                        </div>
+                        {/* Right */}
+                        <div className="sticky right-4 top-1/2 -translate-y-1/2">
+                            <span className="block font-bold text-gray-400 bg-gray-900/90 px-3 py-1 rounded-full border border-gray-700 shadow-lg backdrop-blur-sm whitespace-nowrap">
+                                {axisLabels.right} ▶
+                            </span>
+                        </div>
+                    </div>
 
-            {/* Middle (Left/Right) */}
-            <div className="flex-1 w-full flex justify-between items-start px-4 z-50 pointer-events-none">
-                {/* Left */}
-                <div className="sticky left-4 top-1/2 -translate-y-1/2">
-                    <span className="block font-bold text-gray-400 bg-gray-900/90 px-3 py-1 rounded-full border border-gray-700 shadow-lg backdrop-blur-sm whitespace-nowrap">
-                        ◀ {axisLabels.left}
-                    </span>
-                </div>
-                {/* Right */}
-                <div className="sticky right-4 top-1/2 -translate-y-1/2">
-                    <span className="block font-bold text-gray-400 bg-gray-900/90 px-3 py-1 rounded-full border border-gray-700 shadow-lg backdrop-blur-sm whitespace-nowrap">
-                        {axisLabels.right} ▶
-                    </span>
-                </div>
-            </div>
-
-            {/* Bottom */}
-            <div className="sticky self-center z-50 pointer-events-none transition-all duration-500 ease-in-out"
-                style={{ bottom: isDockOpen ? '220px' : '20px' }}>
-                <span className="font-bold text-gray-400 bg-gray-900/90 px-3 py-1 rounded-full border border-gray-700 shadow-lg backdrop-blur-sm whitespace-nowrap">
-                    ▼ {axisLabels.bottom}
-                </span>
-            </div>
+                    {/* Bottom */}
+                    <div className="sticky self-center z-50 pointer-events-none transition-all duration-500 ease-in-out"
+                        style={{ bottom: isDockOpen ? '220px' : '20px' }}>
+                        <span className="font-bold text-gray-400 bg-gray-900/90 px-3 py-1 rounded-full border border-gray-700 shadow-lg backdrop-blur-sm whitespace-nowrap">
+                            ▼ {axisLabels.bottom}
+                        </span>
+                    </div>
+                </>
+            )}
 
             {/* Empty State */}
             {items.length === 0 && (
                 <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-0 data-hide-export" style={{ width: '100%', height: '100%' }}>
-                    <div className="text-gray-600/50 text-4xl font-bold uppercase tracking-widest text-center" style={{ transform: `scale(${scale})` }}>
+                    <div className="text-gray-600/50 text-4xl font-bold uppercase tracking-widest text-center" style={{ transform: isExport ? 'scale(1)' : `scale(${scale})` }}>
                         Place Your<br />Bias Here
                     </div>
                 </div>
