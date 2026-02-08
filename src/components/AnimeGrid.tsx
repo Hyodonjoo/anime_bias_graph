@@ -19,6 +19,7 @@ interface AnimeGridProps {
     onDragStateChange?: (isDragging: boolean) => void;
     onUpdateTag?: (id: string, tag: string) => void;
     isExport?: boolean;
+    offset?: { x: number; y: number };
 }
 
 // Inner component to handle individual item drag state for performance
@@ -186,7 +187,7 @@ const collides = (r1: Layout, r2: Layout) => {
     );
 };
 
-export default function AnimeGrid({ items, layout, onLayoutChange, onRemoveItem, onDrop, axisLabels, dockId, isDockOpen, scale = 1, onDragStateChange, onUpdateTag, isExport = false }: AnimeGridProps) {
+export default function AnimeGrid({ items, layout, onLayoutChange, onRemoveItem, onDrop, axisLabels, dockId, isDockOpen, scale = 1, onDragStateChange, onUpdateTag, isExport = false, offset = { x: 0, y: 0 } }: AnimeGridProps) {
     const [mounted, setMounted] = React.useState(false);
     const [draggingId, setDraggingId] = useState<string | null>(null);
     const containerRef = useRef<HTMLDivElement>(null);
@@ -308,9 +309,19 @@ export default function AnimeGrid({ items, layout, onLayoutChange, onRemoveItem,
 
         const rect = containerRef.current.getBoundingClientRect();
 
-        // Calculate position relative to the container, accounting for scale
-        const x = (e.clientX - rect.left) / scale;
-        const y = (e.clientY - rect.top) / scale;
+        // Calculate position relative to the container, accounting for scale and center origin
+        // Formula: GridCoord = Center + (ScreenCoord - ScreenCenter - Translate) / Scale
+        // ScreenCenter = RectLeft + Width/2
+        // We know Width is 1000, so Center is 500.
+
+        // This math assumes the container is 1000x1000. 
+        // If container size changes, this 500 constant needs to be dynamic (rect.width / 2)
+
+        const centerX = rect.width / 2;
+        const centerY = rect.height / 2;
+
+        const x = centerX + (e.clientX - rect.left - centerX - offset.x) / scale;
+        const y = centerY + (e.clientY - rect.top - centerY - offset.y) / scale;
 
         const layoutItem: Layout = {
             i: '__dropping_elem__', // handled by parent
@@ -345,7 +356,7 @@ export default function AnimeGrid({ items, layout, onLayoutChange, onRemoveItem,
         <div
             ref={containerRef}
             id={isExport ? "anime-grid-export" : "anime-grid-content"} // Different ID for export
-            className={`relative flex flex-col justify-between ${isExport ? '' : 'group/grid'}`}
+            className={`relative flex flex-col justify-between ${isExport ? '' : 'group/grid overflow-hidden'}`}
             onDragOver={handleDragOver}
             onDrop={handleDropInternal}
             style={{
@@ -358,12 +369,12 @@ export default function AnimeGrid({ items, layout, onLayoutChange, onRemoveItem,
         >
             {/* Visual Content Layer - Scaled (Absolute Background) */}
             <div
-                className="absolute top-0 left-0 origin-top-left z-0 pointer-events-none"
+                className="absolute top-0 left-0 origin-center z-0 pointer-events-none"
                 style={{
                     width: '1000px',
                     height: '1000px',
                     // Force scale 1 for export
-                    transform: isExport ? 'none' : `scale(${scale})`,
+                    transform: isExport ? 'none' : `translate(${offset.x}px, ${offset.y}px) scale(${scale})`,
                     backgroundImage: `
                         linear-gradient(to right, rgba(75, 85, 99, 0.3) 1px, transparent 1px),
                         linear-gradient(to bottom, rgba(75, 85, 99, 0.3) 1px, transparent 1px)
@@ -401,8 +412,8 @@ export default function AnimeGrid({ items, layout, onLayoutChange, onRemoveItem,
             </div>
 
             {/* Interactive Grid Items Layer - Separate from visual background but scaled same way */}
-            <div className="absolute inset-0 z-10 pointer-events-auto origin-top-left"
-                style={{ width: '1000px', height: '1000px', transform: isExport ? 'none' : `scale(${scale})` }}>
+            <div className="absolute inset-0 z-10 pointer-events-auto origin-center"
+                style={{ width: '1000px', height: '1000px', transform: isExport ? 'none' : `translate(${offset.x}px, ${offset.y}px) scale(${scale})` }}>
                 {items.map((item) => {
                     const layoutItem = layout.find(l => l.i === item.layoutId);
                     if (!layoutItem) return null;
@@ -422,66 +433,43 @@ export default function AnimeGrid({ items, layout, onLayoutChange, onRemoveItem,
                     );
                 })}
             </div>
-
-            {/* Labels Layer (Flex Layout for correct stickiness) - Hide during export if desired, or keep fixed */}
-            {/* For export, we likely want simple absolute centering since scrolling is gone */}
-            {isExport ? (
-                <>
-                    <div className="absolute top-4 left-1/2 -translate-x-1/2 z-50">
-                        <span className="font-bold text-gray-400 bg-gray-900/90 px-3 py-1 rounded-full border border-gray-700 shadow-lg whitespace-nowrap">
-                            {axisLabels.top} ▲
-                        </span>
-                    </div>
-                    <div className="absolute left-4 top-1/2 -translate-y-1/2 z-50">
-                        <span className="block font-bold text-gray-400 bg-gray-900/90 px-3 py-1 rounded-full border border-gray-700 shadow-lg whitespace-nowrap">
-                            ◀ {axisLabels.left}
-                        </span>
-                    </div>
-                    <div className="absolute right-4 top-1/2 -translate-y-1/2 z-50">
-                        <span className="block font-bold text-gray-400 bg-gray-900/90 px-3 py-1 rounded-full border border-gray-700 shadow-lg whitespace-nowrap">
-                            {axisLabels.right} ▶
-                        </span>
-                    </div>
-                    <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-50">
-                        <span className="font-bold text-gray-400 bg-gray-900/90 px-3 py-1 rounded-full border border-gray-700 shadow-lg whitespace-nowrap">
-                            ▼ {axisLabels.bottom}
-                        </span>
-                    </div>
-                </>
-            ) : (
+            {/* Labels Layer - Restored inside Grid */}
+            {!isExport && (
                 <>
                     {/* Top */}
-                    <div className="sticky top-4 z-50 self-center pointer-events-none">
+                    <div className="absolute top-4 left-1/2 -translate-x-1/2 z-50 pointer-events-none">
                         <span className="font-bold text-gray-400 bg-gray-900/90 px-3 py-1 rounded-full border border-gray-700 shadow-lg backdrop-blur-sm whitespace-nowrap">
                             {axisLabels.top} ▲
                         </span>
                     </div>
 
-                    {/* Middle (Left/Right) */}
-                    <div className="flex-1 w-full flex justify-between items-start px-4 z-50 pointer-events-none">
-                        {/* Left */}
-                        <div className="sticky left-4 top-1/2 -translate-y-1/2">
-                            <span className="block font-bold text-gray-400 bg-gray-900/90 px-3 py-1 rounded-full border border-gray-700 shadow-lg backdrop-blur-sm whitespace-nowrap">
-                                ◀ {axisLabels.left}
-                            </span>
-                        </div>
-                        {/* Right */}
-                        <div className="sticky right-4 top-1/2 -translate-y-1/2">
-                            <span className="block font-bold text-gray-400 bg-gray-900/90 px-3 py-1 rounded-full border border-gray-700 shadow-lg backdrop-blur-sm whitespace-nowrap">
-                                {axisLabels.right} ▶
-                            </span>
-                        </div>
+                    {/* Left */}
+                    <div className="absolute left-4 top-1/2 -translate-y-1/2 z-50 pointer-events-none">
+                        <span className="block font-bold text-gray-400 bg-gray-900/90 px-3 py-1 rounded-full border border-gray-700 shadow-lg backdrop-blur-sm whitespace-nowrap">
+                            ◀ {axisLabels.left}
+                        </span>
+                    </div>
+
+                    {/* Right */}
+                    <div className="absolute right-4 top-1/2 -translate-y-1/2 z-50 pointer-events-none">
+                        <span className="block font-bold text-gray-400 bg-gray-900/90 px-3 py-1 rounded-full border border-gray-700 shadow-lg backdrop-blur-sm whitespace-nowrap">
+                            {axisLabels.right} ▶
+                        </span>
                     </div>
 
                     {/* Bottom */}
-                    <div className="sticky self-center z-50 pointer-events-none transition-all duration-500 ease-in-out"
-                        style={{ bottom: isDockOpen ? '220px' : '20px' }}>
+                    <div className="absolute left-1/2 -translate-x-1/2 z-50 pointer-events-none transition-all duration-500 ease-in-out"
+                        style={{ bottom: isDockOpen ? 'calc(500px - 50vh + 310px)' : 'calc(500px - 50vh + 100px)' }}>
                         <span className="font-bold text-gray-400 bg-gray-900/90 px-3 py-1 rounded-full border border-gray-700 shadow-lg backdrop-blur-sm whitespace-nowrap">
                             ▼ {axisLabels.bottom}
                         </span>
                     </div>
                 </>
             )}
+
+            {/* For Export - Simple Static Positioning or handled by Canvas logic (Canvas logic is separate in page.tsx handleExport) */}
+            {/* But we might want to show them in the DOM for export preview if needed. The original code hid them for export in DOM but drew them on Canvas. */}
+
 
             {/* Empty State */}
             {items.length === 0 && (

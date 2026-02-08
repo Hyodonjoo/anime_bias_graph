@@ -32,35 +32,93 @@ export default function Home() {
   const gridContainerRef = useRef<HTMLDivElement>(null);
   // ... (rest of refs)
 
+  const [pan, setPan] = useState({ x: 0, y: 0 });
   const isPanningRef = useRef(false);
-  const startPosRef = useRef({ x: 0, y: 0 });
-  const scrollPosRef = useRef({ left: 0, top: 0 });
+  const startMouseRef = useRef({ x: 0, y: 0 });
+  const startPanRef = useRef({ x: 0, y: 0 });
+
+  const GRID_SIZE = 1000;
+
+  // Helper to clamp pan values based on zoom and container size
+  const getClampedPan = (x: number, y: number, scale: number) => {
+    if (!gridContainerRef.current) return { x: 0, y: 0 };
+
+    const container = gridContainerRef.current;
+    const containerW = container.clientWidth;
+    const containerH = container.clientHeight;
+
+    const scaledGridW = GRID_SIZE * scale;
+    const scaledGridH = GRID_SIZE * scale;
+
+    // If grid is smaller than container, allow panning so edges can be brought to center/view
+    // Strict clamp prevents seeing 70-100 if they are off-center or clipped.
+    // User wants "Show 100", meaning we might need to drag the grid even if it "fits" technically centered.
+    // BUT user said "No outside coordinates to show".
+    // The issue is likely that "Fit" means centered, and edges are clipped if container is small?
+    // OR if zoomed in, edges are off screen.
+
+    // Let's try "Max Pan = (Grid Size / 2) - (Container Size / 2)"
+    // If Result > 0, normal pan.
+    // If Result < 0 (Grid smaller), this formula usually yields 0 clamp.
+    // BUT perhaps user wants to move small grid inside big container? 
+    // "No outside" usually means clamping to edges.
+
+    // Re-reading: "Strict doesn't allow 70-100, Relaxed goes outside."
+    // This implies the grid IS bigger than view (or parts are hidden), but the clamp is too tight.
+    // Or the "1000px" logical size doesn't match visual.
+
+    // Let's try calculating max pan based on the premise that we want to be able to touch the edges to the viewport edges.
+    // Max Offset = (ScaledGrid / 2) - (Viewport / 2)
+    // If ScaledGrid > Viewport, this is correct for filling.
+    // If ScaledGrid < Viewport, this would be negative (fail).
+
+    // Actually, if user can't see 70-100, it means ScaledGrid > Viewport ?? 
+    // Or maybe the buffer is needed.
+    // Let's force allow panning to edges even if smaller, bounded by the grid edge itself touching center?
+
+    // Compromise: Allow panning up to (ScaledGrid/2) which is the edge from center.
+    // MINUS (Container/2) to stop when edge hits container edge.
+    // Basically: Math.abs( (ScaledGridW - ContainerW) / 2 )
+
+    // Wait, if 70-100 is not visible, it means it's off-screen.
+    // Let's use the standard "Overflow" logic but ensure we calculate Scaled properly.
+
+    const maxPanX = Math.abs((scaledGridW - containerW) / 2);
+    const maxPanY = Math.abs((scaledGridH - containerH) / 2);
+
+    return {
+      x: Math.max(-maxPanX, Math.min(maxPanX, x)),
+      y: Math.max(-maxPanY, Math.min(maxPanY, y))
+    };
+  };
 
   const handleMouseDown = (e: React.MouseEvent) => {
-    if (!gridContainerRef.current) return;
-
     // Check if we clicked on a card or associated UI (resize handle, button, etc)
     // If so, do NOT start panning the grid.
     if ((e.target as HTMLElement).closest('.anime-grid-card') || (e.target as HTMLElement).closest('.react-resizable-handle')) return;
 
-    // Allow default interaction (e.g. text selection or clicking buttons) unless it's the specific background
-    // But since we want "Drag Map", usually background drag is intended.
     isPanningRef.current = true;
-    startPosRef.current = { x: e.pageX, y: e.pageY };
-    scrollPosRef.current = {
-      left: gridContainerRef.current.scrollLeft,
-      top: gridContainerRef.current.scrollTop
-    };
-    gridContainerRef.current.style.cursor = 'grabbing';
+    startMouseRef.current = { x: e.pageX, y: e.pageY };
+    startPanRef.current = { x: pan.x, y: pan.y };
+
+    if (gridContainerRef.current) {
+      gridContainerRef.current.style.cursor = 'grabbing';
+    }
   };
 
   const handleMouseMove = (e: React.MouseEvent) => {
-    if (!isPanningRef.current || !gridContainerRef.current) return;
+    if (!isPanningRef.current) return;
     e.preventDefault();
-    const x = e.pageX - startPosRef.current.x;
-    const y = e.pageY - startPosRef.current.y;
-    gridContainerRef.current.scrollLeft = scrollPosRef.current.left - x;
-    gridContainerRef.current.scrollTop = scrollPosRef.current.top - y;
+
+    // Calculate delta
+    const deltaX = e.pageX - startMouseRef.current.x;
+    const deltaY = e.pageY - startMouseRef.current.y;
+
+    // Update pan based on start position + delta
+    const rawX = startPanRef.current.x + deltaX;
+    const rawY = startPanRef.current.y + deltaY;
+
+    setPan(getClampedPan(rawX, rawY, zoomLevel));
   };
 
   const handleMouseUp = () => {
@@ -70,18 +128,12 @@ export default function Home() {
     }
   };
 
-  // Center the grid on mount
+  // Re-clamp pan when zoom changes (keep grid within bounds)
   useEffect(() => {
-    if (mounted && gridContainerRef.current) {
-      setTimeout(() => {
-        const container = gridContainerRef.current;
-        if (container) {
-          container.scrollLeft = (container.scrollWidth - container.clientWidth) / 2;
-          container.scrollTop = (container.scrollHeight - container.clientHeight) / 2;
-        }
-      }, 100);
-    }
-  }, [mounted]);
+    setPan(prev => getClampedPan(prev.x, prev.y, zoomLevel));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [zoomLevel]);
+
 
   useEffect(() => {
     setMounted(true);
@@ -451,7 +503,7 @@ export default function Home() {
 
       {/* Main Content - Grid Area */}
       <div
-        className={`flex-1 relative bg-stone-950 cursor-grab active:cursor-grabbing scrollbar-hide ${isItemDragging ? 'overflow-hidden' : 'overflow-auto'}`}
+        className={`flex-1 relative bg-stone-950 cursor-grab active:cursor-grabbing scrollbar-hide ${isItemDragging ? 'overflow-hidden' : 'overflow-hidden'}`} // Force hidden on container
         ref={gridContainerRef}
         onMouseDown={handleMouseDown}
         onMouseMove={handleMouseMove}
@@ -472,6 +524,7 @@ export default function Home() {
             onDrop={handleDrop}
             onDragStateChange={setIsItemDragging}
             onUpdateTag={handleUpdateTag}
+            offset={pan}
           />
         </div>
       </div>
