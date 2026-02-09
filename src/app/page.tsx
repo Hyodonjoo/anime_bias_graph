@@ -6,12 +6,13 @@ import AnimeGrid from '@/components/AnimeGrid';
 import AnimeDock from '@/components/AnimeDock';
 import { AnimeItem } from '@/lib/mockData';
 import { supabase } from '@/lib/supabase';
-import { ChevronUp, ChevronDown, Download, Plus, Minus } from 'lucide-react';
+import { ChevronUp, ChevronDown, Download, Plus, Minus, Eye, EyeOff } from 'lucide-react';
 import { toCanvas } from 'html-to-image';
 
 export default function Home() {
   const [themeTitle, setThemeTitle] = useState('');
   const [axisLabels, setAxisLabels] = useState({ top: '', bottom: '', left: '', right: '' });
+  const [showAxisLabels, setShowAxisLabels] = useState(true);
   const [dockItems, setDockItems] = useState<AnimeItem[]>([]);
   const [gridItems, setGridItems] = useState<(AnimeItem & { layoutId: string })[]>([]);
   const [isDockOpen, setIsDockOpen] = useState(true);
@@ -25,12 +26,11 @@ export default function Home() {
   // Fixed layout state instead of responsive breakpoints
   const [layout, setLayout] = useState<Layout[]>([]);
   const [mounted, setMounted] = useState(false);
-  const [isItemDragging, setIsItemDragging] = useState(false); // Add dragging state
-  const [themeId, setThemeId] = useState<string | null>(null); // Track Theme ID for saving
+  const [isItemDragging, setIsItemDragging] = useState(false);
+  const [themeId, setThemeId] = useState<string | null>(null);
 
   // Drag to Scroll Refs
   const gridContainerRef = useRef<HTMLDivElement>(null);
-  // ... (rest of refs)
 
   const [pan, setPan] = useState({ x: 0, y: 0 });
   const isPanningRef = useRef(false);
@@ -50,41 +50,25 @@ export default function Home() {
     const scaledGridW = GRID_SIZE * scale;
     const scaledGridH = GRID_SIZE * scale;
 
-    // If grid is smaller than container, allow panning so edges can be brought to center/view
-    // Strict clamp prevents seeing 70-100 if they are off-center or clipped.
-    // User wants "Show 100", meaning we might need to drag the grid even if it "fits" technically centered.
-    // BUT user said "No outside coordinates to show".
-    // The issue is likely that "Fit" means centered, and edges are clipped if container is small?
-    // OR if zoomed in, edges are off screen.
+    let maxPanX = 0;
+    let maxPanY = 0;
 
-    // Let's try "Max Pan = (Grid Size / 2) - (Container Size / 2)"
-    // If Result > 0, normal pan.
-    // If Result < 0 (Grid smaller), this formula usually yields 0 clamp.
-    // BUT perhaps user wants to move small grid inside big container? 
-    // "No outside" usually means clamping to edges.
+    // Use a small threshold for "1.0" to handle potential float precision issues (1.0 vs 1.0000001)
+    if (scale < 1.01) {
+      // Strict Mode: When zoomed out or at 100%, lock strictly to center unless content overflows
+      // This prevents "moving screen when shrunk"
+      maxPanX = scaledGridW > containerW ? (scaledGridW - containerW) / 2 : 0;
+      maxPanY = scaledGridH > containerH ? (scaledGridH - containerH) / 2 : 0;
+    } else {
+      // Zoomed Mode: Allow panning to ensure edges are accessible
+      // Increase BUFFER to 500 to allow pulling edges well into the screen even at 150%
+      const overflowX = Math.max(0, (scaledGridW - containerW) / 2);
+      const overflowY = Math.max(0, (scaledGridH - containerH) / 2);
 
-    // Re-reading: "Strict doesn't allow 70-100, Relaxed goes outside."
-    // This implies the grid IS bigger than view (or parts are hidden), but the clamp is too tight.
-    // Or the "1000px" logical size doesn't match visual.
-
-    // Let's try calculating max pan based on the premise that we want to be able to touch the edges to the viewport edges.
-    // Max Offset = (ScaledGrid / 2) - (Viewport / 2)
-    // If ScaledGrid > Viewport, this is correct for filling.
-    // If ScaledGrid < Viewport, this would be negative (fail).
-
-    // Actually, if user can't see 70-100, it means ScaledGrid > Viewport ?? 
-    // Or maybe the buffer is needed.
-    // Let's force allow panning to edges even if smaller, bounded by the grid edge itself touching center?
-
-    // Compromise: Allow panning up to (ScaledGrid/2) which is the edge from center.
-    // MINUS (Container/2) to stop when edge hits container edge.
-    // Basically: Math.abs( (ScaledGridW - ContainerW) / 2 )
-
-    // Wait, if 70-100 is not visible, it means it's off-screen.
-    // Let's use the standard "Overflow" logic but ensure we calculate Scaled properly.
-
-    const maxPanX = Math.abs((scaledGridW - containerW) / 2);
-    const maxPanY = Math.abs((scaledGridH - containerH) / 2);
+      const BUFFER = 500;
+      maxPanX = overflowX + BUFFER;
+      maxPanY = overflowY + BUFFER;
+    }
 
     return {
       x: Math.max(-maxPanX, Math.min(maxPanX, x)),
@@ -94,7 +78,6 @@ export default function Home() {
 
   const handleMouseDown = (e: React.MouseEvent) => {
     // Check if we clicked on a card or associated UI (resize handle, button, etc)
-    // If so, do NOT start panning the grid.
     if ((e.target as HTMLElement).closest('.anime-grid-card') || (e.target as HTMLElement).closest('.react-resizable-handle')) return;
 
     isPanningRef.current = true;
@@ -131,7 +114,6 @@ export default function Home() {
   // Re-clamp pan when zoom changes (keep grid within bounds)
   useEffect(() => {
     setPan(prev => getClampedPan(prev.x, prev.y, zoomLevel));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [zoomLevel]);
 
 
@@ -217,7 +199,6 @@ export default function Home() {
   };
 
   const handleLayoutChange = (newLayout: Layout[]) => {
-    // Just update layout without forcing min sizes
     setLayout(newLayout);
   };
 
@@ -225,7 +206,6 @@ export default function Home() {
     const itemToRemove = gridItems.find(i => i.layoutId === id);
     if (!itemToRemove) return;
 
-    // Remove the tag when returning to dock
     const { tag, ...cleanedItem } = itemToRemove;
 
     setGridItems(prev => prev.filter(i => i.layoutId !== id));
@@ -246,12 +226,10 @@ export default function Home() {
 
     try {
       const itemData = JSON.parse(data);
-      // Remove from dock
       setDockItems(prev => prev.filter(i => i.id !== itemData.id));
 
       const newLayoutId = `${itemData.id}-${Date.now()}`;
 
-      // Add to grid items
       setGridItems(prev => [...prev, { ...itemData, layoutId: newLayoutId }]);
 
       // Update Layout with the RESOLVED positions from AnimeGrid
@@ -363,7 +341,7 @@ export default function Home() {
           img.onload = resolve;
           img.onerror = () => {
             console.warn(`Failed to load image for ${item.title}`);
-            resolve(null); // Resolve anyway to continue
+            resolve(null);
           };
         });
 
@@ -378,20 +356,10 @@ export default function Home() {
         const { img, x, y, tag } = data;
         const ITEM_SIZE = 60; // 60px fixed
 
-        // Save context for clipping rounded corners (if any) - currently square in design
-        // But let's add a small border/shadow like the CSS
-
-        // Shadow/Glow
-        // ctx.shadowColor = 'rgba(0,0,0,0.5)';
-        // ctx.shadowBlur = 4;
-        // ctx.fillRect(x, y, ITEM_SIZE, ITEM_SIZE);
-        // ctx.shadowColor = 'transparent';
-
         // Draw Image
         try {
           ctx.drawImage(img, x, y, ITEM_SIZE, ITEM_SIZE);
         } catch (e) {
-          // Fallback color if image fails to draw (rare if onload passed)
           ctx.fillStyle = '#333';
           ctx.fillRect(x, y, ITEM_SIZE, ITEM_SIZE);
         }
@@ -414,7 +382,6 @@ export default function Home() {
 
           // Tag Background
           ctx.fillStyle = 'rgba(0, 0, 0, 0.8)';
-          // Round rect approx
           ctx.fillRect(tagX - textWidth / 2 - padding, tagY, textWidth + padding * 2, 14);
 
           // Tag Text
@@ -456,7 +423,8 @@ export default function Home() {
       // Bottom
       drawLabel(`▼ ${axisLabels.bottom}`, GRID_SIZE / 2, GRID_SIZE - 20);
       // Left
-      drawLabel(`◀ ${axisLabels.left}`, 60, GRID_SIZE / 2); // approximate nice position
+      drawLabel(`◀ ${axisLabels.left}`, 60, GRID_SIZE / 2);
+
       // Right
       drawLabel(`${axisLabels.right} ▶`, GRID_SIZE - 60, GRID_SIZE / 2);
 
@@ -492,6 +460,14 @@ export default function Home() {
         {/* Right: Export Button */}
         <div className="flex items-center gap-3">
           <button
+            onClick={() => setShowAxisLabels(!showAxisLabels)}
+            className="flex items-center gap-2 px-3 py-2 bg-stone-800 hover:bg-stone-700 text-stone-200 rounded-lg text-sm font-bold shadow-md transition-all active:scale-95 border border-stone-700"
+            title={showAxisLabels ? "Hide Axis Labels" : "Show Axis Labels"}
+          >
+            {showAxisLabels ? <Eye size={16} /> : <EyeOff size={16} />}
+          </button>
+
+          <button
             onClick={handleExport}
             className="flex items-center gap-2 px-4 py-2 bg-stone-100 hover:bg-white text-stone-900 rounded-lg text-sm font-bold shadow-md hover:shadow-lg transition-all active:scale-95"
           >
@@ -525,6 +501,7 @@ export default function Home() {
             onDragStateChange={setIsItemDragging}
             onUpdateTag={handleUpdateTag}
             offset={pan}
+            showAxisLabels={showAxisLabels}
           />
         </div>
       </div>

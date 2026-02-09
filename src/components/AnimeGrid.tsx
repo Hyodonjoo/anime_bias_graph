@@ -20,6 +20,7 @@ interface AnimeGridProps {
     onUpdateTag?: (id: string, tag: string) => void;
     isExport?: boolean;
     offset?: { x: number; y: number };
+    showAxisLabels?: boolean;
 }
 
 // Inner component to handle individual item drag state for performance
@@ -113,7 +114,6 @@ const DraggableGridItem = ({
             scale={scale}
             bounds="parent" // Constraint to grid area
             disabled={isExport}
-        // grid={[20, 20]} // Optional: Enable if user wants snapping. Commented out for "Free Drag".
         >
             <div
                 ref={nodeRef}
@@ -187,7 +187,7 @@ const collides = (r1: Layout, r2: Layout) => {
     );
 };
 
-export default function AnimeGrid({ items, layout, onLayoutChange, onRemoveItem, onDrop, axisLabels, dockId, isDockOpen, scale = 1, onDragStateChange, onUpdateTag, isExport = false, offset = { x: 0, y: 0 } }: AnimeGridProps) {
+export default function AnimeGrid({ items, layout, onLayoutChange, onRemoveItem, onDrop, axisLabels, dockId, isDockOpen, scale = 1, onDragStateChange, onUpdateTag, isExport = false, offset = { x: 0, y: 0 }, showAxisLabels = true }: AnimeGridProps) {
     const [mounted, setMounted] = React.useState(false);
     const [draggingId, setDraggingId] = useState<string | null>(null);
     const containerRef = useRef<HTMLDivElement>(null);
@@ -197,7 +197,7 @@ export default function AnimeGrid({ items, layout, onLayoutChange, onRemoveItem,
     }, []);
 
     const resolveLayout = (currentLayout: Layout[], movingItem: Layout): Layout[] => {
-        // Create a map for faster lookup, but array is fine for small N
+        // Update layout mapping
         let newLayout = currentLayout.map(l => l.i === movingItem.i ? movingItem : l);
 
         // Simple cascade push
@@ -216,8 +216,6 @@ export default function AnimeGrid({ items, layout, onLayoutChange, onRemoveItem,
                 // If collision
                 if (collides(current, other)) {
                     // Push 'other' down
-                    // Ideally, we push it exactly enough to clear 'current'
-                    // Since 'current' might be above or moving, simple "Push Down" is robust.
                     // New Y = current.y + current.h
                     const newY = current.y + current.h;
 
@@ -310,12 +308,9 @@ export default function AnimeGrid({ items, layout, onLayoutChange, onRemoveItem,
         const rect = containerRef.current.getBoundingClientRect();
 
         // Calculate position relative to the container, accounting for scale and center origin
+        // Calculate position relative to the container, accounting for scale and center origin
         // Formula: GridCoord = Center + (ScreenCoord - ScreenCenter - Translate) / Scale
-        // ScreenCenter = RectLeft + Width/2
-        // We know Width is 1000, so Center is 500.
 
-        // This math assumes the container is 1000x1000. 
-        // If container size changes, this 500 constant needs to be dynamic (rect.width / 2)
 
         const centerX = rect.width / 2;
         const centerY = rect.height / 2;
@@ -434,7 +429,7 @@ export default function AnimeGrid({ items, layout, onLayoutChange, onRemoveItem,
                 })}
             </div>
             {/* Labels Layer - Restored inside Grid */}
-            {!isExport && (
+            {!isExport && showAxisLabels && (
                 <>
                     {/* Top */}
                     <div className="absolute top-4 left-1/2 -translate-x-1/2 z-50 pointer-events-none">
@@ -466,10 +461,6 @@ export default function AnimeGrid({ items, layout, onLayoutChange, onRemoveItem,
                     </div>
                 </>
             )}
-
-            {/* For Export - Simple Static Positioning or handled by Canvas logic (Canvas logic is separate in page.tsx handleExport) */}
-            {/* But we might want to show them in the DOM for export preview if needed. The original code hid them for export in DOM but drew them on Canvas. */}
-
 
             {/* Empty State */}
             {items.length === 0 && (
