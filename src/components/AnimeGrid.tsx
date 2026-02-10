@@ -4,7 +4,6 @@ import React, { useRef, useState, useEffect } from 'react';
 import Draggable, { DraggableEventHandler, DraggableData, DraggableEvent } from 'react-draggable';
 import { AnimeItem } from '@/lib/mockData';
 import Image from 'next/image';
-import { X } from 'lucide-react';
 import { Layout } from '@/types/layout';
 
 interface AnimeGridProps {
@@ -13,11 +12,15 @@ interface AnimeGridProps {
     onLayoutChange: (layout: Layout[]) => void;
     onRemoveItem: (id: string) => void;
     onDrop: (layout: Layout[], item: Layout, event: DragEvent) => void;
-    droppingItem?: { w: number; h: number; i: string }; // Not used for RGL anymore, but keeping for compatibility? We'll maintain similar signature.
     axisLabels: { top: string; bottom: string; left: string; right: string };
     dockId?: string;
     isDockOpen?: boolean;
     scale?: number;
+    onDragStateChange?: (isDragging: boolean) => void;
+    onUpdateTag?: (id: string, tag: string) => void;
+    isExport?: boolean;
+    offset?: { x: number; y: number };
+    showAxisLabels?: boolean;
 }
 
 // Inner component to handle individual item drag state for performance
@@ -28,7 +31,9 @@ const DraggableGridItem = ({
     onStop,
     onRemove,
     scale,
-    isDragging
+    isDragging,
+    onUpdateTag,
+    isExport
 }: {
     item: AnimeItem & { layoutId: string };
     layoutItem: Layout;
@@ -37,10 +42,21 @@ const DraggableGridItem = ({
     onRemove: (id: string) => void;
     scale: number;
     isDragging: boolean;
+    onUpdateTag?: (id: string, tag: string) => void;
+    isExport?: boolean;
 }) => {
-    // Local state for smooth dragging without updating parent constantly
+    // Local state for smooth dragging without dragging parent constantly
     const [position, setPosition] = useState({ x: layoutItem.x, y: layoutItem.y });
     const nodeRef = useRef(null);
+    const [isEditingTag, setIsEditingTag] = useState(false);
+    const [tagInput, setTagInput] = useState(item.tag || '');
+    const inputRef = useRef<HTMLInputElement>(null);
+
+    useEffect(() => {
+        if (isEditingTag && inputRef.current) {
+            inputRef.current.focus();
+        }
+    }, [isEditingTag]);
 
     // Sync if parent updates layout (e.g. from DB load or PUSH effect)
     // IMPORTANT: Do NOT sync if this item is currently being dragged by the user,
@@ -52,13 +68,41 @@ const DraggableGridItem = ({
     }, [layoutItem.x, layoutItem.y, isDragging]);
 
     const handleDrag: DraggableEventHandler = (e, data) => {
+        if (isExport) return;
         setPosition({ x: data.x, y: data.y });
         onDrag(item.layoutId, data.x, data.y);
     };
 
     const handleStop: DraggableEventHandler = (e, data) => {
+        if (isExport) return;
         setPosition({ x: data.x, y: data.y });
         onStop(item.layoutId, data.x, data.y, e);
+    };
+
+    const handleStartEdit = (e: React.MouseEvent) => {
+        if (isExport) return;
+        e.stopPropagation();
+        e.preventDefault();
+        if (!onUpdateTag) return;
+        setTagInput(item.tag || '');
+        setIsEditingTag(true);
+    };
+
+    const handleTagSubmit = () => {
+        setIsEditingTag(false);
+        if (onUpdateTag) {
+            onUpdateTag(item.layoutId, tagInput.trim());
+        }
+    };
+
+    const handleTagKeyDown = (e: React.KeyboardEvent) => {
+        e.stopPropagation();
+        if (e.key === 'Enter') {
+            handleTagSubmit();
+        } else if (e.key === 'Escape') {
+            setIsEditingTag(false);
+            setTagInput(item.tag || '');
+        }
     };
 
     return (
@@ -69,33 +113,19 @@ const DraggableGridItem = ({
             onStop={handleStop}
             scale={scale}
             bounds="parent" // Constraint to grid area
-        // grid={[20, 20]} // Optional: Enable if user wants snapping. Commented out for "Free Drag".
+            disabled={isExport}
         >
             <div
                 ref={nodeRef}
-                className="group absolute bg-gray-800 rounded-none border border-gray-700 overflow-hidden shadow-none hover:shadow-md transition-shadow cursor-move"
+                className={`group absolute bg-gray-800 rounded-none border border-gray-700 overflow-visible shadow-none ${isExport ? '' : 'hover:shadow-md cursor-move'} transition-shadow anime-grid-card`}
                 style={{
                     width: '60px',
                     height: '60px',
-                    left: 0, // Draggable uses transform, so left/top should be 0 ideally or managed. 
-                    // Actually, Draggable applies transform. If we use position prop, we shouldn't set left/top unless using Position: absolute logic without transform. 
-                    // specific react-draggable behavior: it applies translate. So initial position is from 0,0 relative to parent.
-                    // Important: The element needs to be absolute for bounds="parent" to calculate correctly against a relative parent? 
-                    // "DraggableCore" vs "Draggable": Draggable adds styles.
+                    left: 0,
                     position: 'absolute'
                 }}
             >
-                <div className="absolute top-0 right-0 z-20 opacity-0 group-hover:opacity-100">
-                    <button
-                        onPointerDown={(e) => e.stopPropagation()} // Prevent drag start when clicking close
-                        onClick={(e) => { e.stopPropagation(); onRemove(item.layoutId); }}
-                        className="bg-red-500/80 text-white w-full h-full flex items-center justify-center hover:bg-red-600 rounded-bl-md"
-                        style={{ width: '20px', height: '20px' }}
-                    >
-                        <X size={12} />
-                    </button>
-                </div>
-                <div className="w-full h-full relative pointer-events-none"> {/* content pointer-events-none to let drag pass through easily? or just on image */}
+                <div className="w-full h-full relative pointer-events-none">
                     <Image
                         src={item.imageUrl}
                         alt={item.title}
@@ -105,6 +135,43 @@ const DraggableGridItem = ({
                         sizes="60px"
                     />
                 </div>
+
+                {/* Tag Display / Editor */}
+                {isEditingTag ? (
+                    <div className="absolute -bottom-8 left-1/2 -translate-x-1/2 z-[60]">
+                        <input
+                            ref={inputRef}
+                            type="text"
+                            value={tagInput}
+                            onChange={(e) => setTagInput(e.target.value)}
+                            maxLength={12}
+                            onBlur={handleTagSubmit}
+                            onKeyDown={handleTagKeyDown}
+                            onMouseDown={(e) => e.stopPropagation()}
+                            className="bg-black/90 text-white text-[10px] px-2 py-1 rounded border border-blue-500 outline-none text-center w-24 shadow-lg"
+                            placeholder="Tag..."
+                        />
+                    </div>
+                ) : (
+                    item.tag && (
+                        <div className="absolute -bottom-6 left-1/2 -translate-x-1/2 bg-black/80 text-white text-[10px] px-1.5 py-0.5 rounded whitespace-nowrap z-50 pointer-events-none shadow-sm">
+                            {item.tag}
+                        </div>
+                    )
+                )}
+
+                {/* Edit Tag Button - Top Right - Hide in Export */}
+                {!isExport && (
+                    <div
+                        onClick={handleStartEdit}
+                        className="absolute -top-2 -right-2 w-5 h-5 bg-blue-500 hover:bg-blue-400 text-white rounded-full flex items-center justify-center cursor-pointer opacity-0 group-hover:opacity-100 transition-opacity shadow-sm z-50"
+                        title="Edit Tag"
+                    >
+                        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                            <path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"></path>
+                        </svg>
+                    </div>
+                )}
             </div>
         </Draggable>
     );
@@ -120,7 +187,7 @@ const collides = (r1: Layout, r2: Layout) => {
     );
 };
 
-export default function AnimeGrid({ items, layout, onLayoutChange, onRemoveItem, onDrop, axisLabels, dockId, isDockOpen, scale = 1 }: AnimeGridProps) {
+export default function AnimeGrid({ items, layout, onLayoutChange, onRemoveItem, onDrop, axisLabels, dockId, isDockOpen, scale = 1, onDragStateChange, onUpdateTag, isExport = false, offset = { x: 0, y: 0 }, showAxisLabels = true }: AnimeGridProps) {
     const [mounted, setMounted] = React.useState(false);
     const [draggingId, setDraggingId] = useState<string | null>(null);
     const containerRef = useRef<HTMLDivElement>(null);
@@ -130,7 +197,7 @@ export default function AnimeGrid({ items, layout, onLayoutChange, onRemoveItem,
     }, []);
 
     const resolveLayout = (currentLayout: Layout[], movingItem: Layout): Layout[] => {
-        // Create a map for faster lookup, but array is fine for small N
+        // Update layout mapping
         let newLayout = currentLayout.map(l => l.i === movingItem.i ? movingItem : l);
 
         // Simple cascade push
@@ -149,8 +216,6 @@ export default function AnimeGrid({ items, layout, onLayoutChange, onRemoveItem,
                 // If collision
                 if (collides(current, other)) {
                     // Push 'other' down
-                    // Ideally, we push it exactly enough to clear 'current'
-                    // Since 'current' might be above or moving, simple "Push Down" is robust.
                     // New Y = current.y + current.h
                     const newY = current.y + current.h;
 
@@ -167,21 +232,26 @@ export default function AnimeGrid({ items, layout, onLayoutChange, onRemoveItem,
 
     const handleItemDragStart = (id: string) => {
         setDraggingId(id);
+        if (onDragStateChange) onDragStateChange(true);
     };
 
     const handleItemDrag = (id: string, x: number, y: number) => {
+        // ... (existing logic)
         // Find current item
         const verifyItem = layout.find(l => l.i === id);
         if (!verifyItem) return;
 
         const movingItem = { ...verifyItem, x, y };
-        const newLayout = resolveLayout(layout, movingItem);
+        // Just update the moving item, do NOT resolve collisions for others during drag
+        const newLayout = layout.map(l => l.i === id ? movingItem : l);
 
         onLayoutChange(newLayout);
     };
 
     const handleItemDragStop = (id: string, x: number, y: number, e: DraggableEvent) => {
         setDraggingId(null);
+        if (onDragStateChange) onDragStateChange(false);
+        // ... (rest of simple logic: Dock removal check, final position sync)
 
         // Check for drop on Dock to remove
         if (dockId) {
@@ -210,6 +280,7 @@ export default function AnimeGrid({ items, layout, onLayoutChange, onRemoveItem,
                         clientY <= dockRect.bottom
                     ) {
                         onRemoveItem(id);
+                        if (onDragStateChange) onDragStateChange(false); // Ensure false if returning early
                         return;
                     }
                 }
@@ -230,21 +301,22 @@ export default function AnimeGrid({ items, layout, onLayoutChange, onRemoveItem,
     };
 
     const handleDropInternal = (e: React.DragEvent) => {
+        if (isExport) return;
         e.preventDefault();
         if (!containerRef.current) return;
 
         const rect = containerRef.current.getBoundingClientRect();
 
-        // Calculate position relative to the container, accounting for scale
-        // x_scaled = (clientX - left) / scale
-        const x = (e.clientX - rect.left) / scale;
-        const y = (e.clientY - rect.top) / scale;
+        // Calculate position relative to the container, accounting for scale and center origin
+        // Calculate position relative to the container, accounting for scale and center origin
+        // Formula: GridCoord = Center + (ScreenCoord - ScreenCenter - Translate) / Scale
 
-        // Create a layout item with pixel coordinates
-        // Centering the 60x60 item on the mouse? 
-        // Mouse is usually at top-left of dragged ghost? Or where user grabbed.
-        // Let's center it for better UX, or just use click position as top-left.
-        // Using top-left is standard for "drop coords".
+
+        const centerX = rect.width / 2;
+        const centerY = rect.height / 2;
+
+        const x = centerX + (e.clientX - rect.left - centerX - offset.x) / scale;
+        const y = centerY + (e.clientY - rect.top - centerY - offset.y) / scale;
 
         const layoutItem: Layout = {
             i: '__dropping_elem__', // handled by parent
@@ -256,52 +328,11 @@ export default function AnimeGrid({ items, layout, onLayoutChange, onRemoveItem,
 
         if (onDrop) {
             // Pre-resolve collision for the dropped item
-            // We need to merge the temp item into current layout to check collisions, 
-            // then pass the CLEAN layout + New Item to parent
-
-            // Wait, onDrop expects the final layout including the new item?
-            // Usually parent adds it. 
-            // We can locally calculate the valid position?
-
-            // Let's just pass the item. The user's code in page.tsx adds it to layout.
-            // But page.tsx is dumb. It just appends.
-            // We should arguably return a "Clean Layout" suggestion.
-            // But strict signature: onDrop(layout, item, event).
-
-            // Let's run the resolver on the hypothetical layout
             const prospectiveLayout = [...layout, layoutItem];
             const resolvedLayout = resolveLayout(prospectiveLayout, layoutItem);
 
-            // Pass this resolved layout to parent?
-            // The parent `handleDrop` calls `setLayout([...prev, newItem])`.
-            // If we pass `resolvedLayout` as the first arg, does it use it? 
-            // Parent: `const handleDrop = (layout: Layout[], ...)` -> checks `layout`.
-            // Currently parent implementation: `setLayout(prev => [...prev, newLayoutItem])`.
-            // It completely IGNORES the first argument `layout` currently in page.tsx! 
-            // It uses `prev` state of layout.
-            // So we need to fix page.tsx? OR just fix it here by passing correct `layoutItem`?
-
-            // If we fix `layoutItem` to include the pushed Y, that solves collision with the new item,
-            // BUT it doesn't solve if we pushed *others* to make space.
-
-            // Since we can't easily force parent logic change from here without editing page.tsx,
-            // we will just rely on the user dragging it afterwards or initial placement being rough.
-            // HOWEVER, the user asked for "Drop" behavior too.
-            // The best hook is: We perform the calculation, find the "Safe Spot" (maybe pushed down others?), 
-            // AND we update `layout` prop immediately? No, `onLayoutChange` might be better.
-
-            // Let's CALL `onLayoutChange` with the displaced items excluding the new one?
-            // No, the new item isn't in `layout` yet.
-
-            // For now, let's just emit the drop. The user can drag to fix.
-            // Or better: Simulate drag once immediately after mount?
-            // Let's leave Drop basic for now, provided Drag fixes it. 
-            // If needed we can refactor `handleDrop` in page.tsx later.
-
-            // Actually, we can just pass the `layoutItem` but with updated Y?
-            // No, because existing items might need to move.
-
-            onDrop(layout, layoutItem, e.nativeEvent as DragEvent);
+            // Pass the FULL resolved layout (including pushed items) to parent
+            onDrop(resolvedLayout, layoutItem, e.nativeEvent as DragEvent);
         }
     };
 
@@ -319,28 +350,32 @@ export default function AnimeGrid({ items, layout, onLayoutChange, onRemoveItem,
     return (
         <div
             ref={containerRef}
-            id="anime-grid-content"
-            className="relative group/grid flex flex-col justify-between"
+            id={isExport ? "anime-grid-export" : "anime-grid-content"} // Different ID for export
+            className={`relative flex flex-col justify-between ${isExport ? '' : 'group/grid overflow-hidden'}`}
             onDragOver={handleDragOver}
             onDrop={handleDropInternal}
             style={{
-                width: `${1000 * scale}px`,
-                height: `${1000 * scale}px`,
-                backgroundColor: 'rgba(17, 24, 39, 0.5)'
+                width: '1000px', // Fixed size
+                height: '1000px',
+                // Use scale 1 for export, otherwise props
+                transform: isExport ? 'none' : undefined,
+                backgroundColor: isExport ? '#0c0a09' : 'rgba(17, 24, 39, 0.5)' // Solid black for export, trans for UI
             }}
         >
             {/* Visual Content Layer - Scaled (Absolute Background) */}
             <div
-                className="absolute top-0 left-0 origin-top-left z-0 pointer-events-none"
+                className="absolute top-0 left-0 origin-center z-0 pointer-events-none"
                 style={{
                     width: '1000px',
                     height: '1000px',
-                    transform: `scale(${scale})`,
+                    // Force scale 1 for export
+                    transform: isExport ? 'none' : `translate(${offset.x}px, ${offset.y}px) scale(${scale})`,
                     backgroundImage: `
                         linear-gradient(to right, rgba(75, 85, 99, 0.3) 1px, transparent 1px),
                         linear-gradient(to bottom, rgba(75, 85, 99, 0.3) 1px, transparent 1px)
                     `,
                     backgroundSize: '20px 20px',
+                    backgroundPosition: '0 0'
                 }}
             >
                 {/* Axis Lines & Origin */}
@@ -372,8 +407,8 @@ export default function AnimeGrid({ items, layout, onLayoutChange, onRemoveItem,
             </div>
 
             {/* Interactive Grid Items Layer - Separate from visual background but scaled same way */}
-            <div className="absolute inset-0 z-10 pointer-events-auto origin-top-left"
-                style={{ width: '1000px', height: '1000px', transform: `scale(${scale})` }}>
+            <div className="absolute inset-0 z-10 pointer-events-auto origin-center"
+                style={{ width: '1000px', height: '1000px', transform: isExport ? 'none' : `translate(${offset.x}px, ${offset.y}px) scale(${scale})` }}>
                 {items.map((item) => {
                     const layoutItem = layout.find(l => l.i === item.layoutId);
                     if (!layoutItem) return null;
@@ -385,50 +420,52 @@ export default function AnimeGrid({ items, layout, onLayoutChange, onRemoveItem,
                             onDrag={handleItemDrag}
                             onStop={handleItemDragStop}
                             onRemove={onRemoveItem}
-                            scale={scale}
+                            scale={isExport ? 1 : scale}
                             isDragging={draggingId === item.layoutId}
+                            onUpdateTag={onUpdateTag}
+                            isExport={isExport}
                         />
                     );
                 })}
             </div>
+            {/* Labels Layer - Restored inside Grid */}
+            {!isExport && showAxisLabels && (
+                <>
+                    {/* Top */}
+                    <div className="absolute top-4 left-1/2 -translate-x-1/2 z-50 pointer-events-none">
+                        <span className="font-bold text-gray-400 bg-gray-900/90 px-3 py-1 rounded-full border border-gray-700 shadow-lg backdrop-blur-sm whitespace-nowrap">
+                            {axisLabels.top} ▲
+                        </span>
+                    </div>
 
-            {/* Labels Layer (Flex Layout for correct stickiness) */}
+                    {/* Left */}
+                    <div className="absolute left-4 top-1/2 -translate-y-1/2 z-50 pointer-events-none">
+                        <span className="block font-bold text-gray-400 bg-gray-900/90 px-3 py-1 rounded-full border border-gray-700 shadow-lg backdrop-blur-sm whitespace-nowrap">
+                            ◀ {axisLabels.left}
+                        </span>
+                    </div>
 
-            {/* Top */}
-            <div className="sticky top-4 z-50 self-center pointer-events-none">
-                <span className="font-bold text-gray-400 bg-gray-900/90 px-3 py-1 rounded-full border border-gray-700 shadow-lg backdrop-blur-sm whitespace-nowrap">
-                    {axisLabels.top} ▲
-                </span>
-            </div>
+                    {/* Right */}
+                    <div className="absolute right-4 top-1/2 -translate-y-1/2 z-50 pointer-events-none">
+                        <span className="block font-bold text-gray-400 bg-gray-900/90 px-3 py-1 rounded-full border border-gray-700 shadow-lg backdrop-blur-sm whitespace-nowrap">
+                            {axisLabels.right} ▶
+                        </span>
+                    </div>
 
-            {/* Middle (Left/Right) */}
-            <div className="flex-1 w-full flex justify-between items-start px-4 z-50 pointer-events-none">
-                {/* Left */}
-                <div className="sticky left-4 top-1/2 -translate-y-1/2">
-                    <span className="block font-bold text-gray-400 bg-gray-900/90 px-3 py-1 rounded-full border border-gray-700 shadow-lg backdrop-blur-sm whitespace-nowrap">
-                        ◀ {axisLabels.left}
-                    </span>
-                </div>
-                {/* Right */}
-                <div className="sticky right-4 top-1/2 -translate-y-1/2">
-                    <span className="block font-bold text-gray-400 bg-gray-900/90 px-3 py-1 rounded-full border border-gray-700 shadow-lg backdrop-blur-sm whitespace-nowrap">
-                        {axisLabels.right} ▶
-                    </span>
-                </div>
-            </div>
-
-            {/* Bottom */}
-            <div className="sticky self-center z-50 pointer-events-none transition-all duration-500 ease-in-out"
-                style={{ bottom: isDockOpen ? '220px' : '20px' }}>
-                <span className="font-bold text-gray-400 bg-gray-900/90 px-3 py-1 rounded-full border border-gray-700 shadow-lg backdrop-blur-sm whitespace-nowrap">
-                    ▼ {axisLabels.bottom}
-                </span>
-            </div>
+                    {/* Bottom */}
+                    <div className="absolute left-1/2 -translate-x-1/2 z-50 pointer-events-none transition-all duration-500 ease-in-out"
+                        style={{ bottom: isDockOpen ? 'calc(500px - 50vh + 310px)' : 'calc(500px - 50vh + 100px)' }}>
+                        <span className="font-bold text-gray-400 bg-gray-900/90 px-3 py-1 rounded-full border border-gray-700 shadow-lg backdrop-blur-sm whitespace-nowrap">
+                            ▼ {axisLabels.bottom}
+                        </span>
+                    </div>
+                </>
+            )}
 
             {/* Empty State */}
             {items.length === 0 && (
                 <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-0 data-hide-export" style={{ width: '100%', height: '100%' }}>
-                    <div className="text-gray-600/50 text-4xl font-bold uppercase tracking-widest text-center" style={{ transform: `scale(${scale})` }}>
+                    <div className="text-gray-600/50 text-4xl font-bold uppercase tracking-widest text-center" style={{ transform: isExport ? 'scale(1)' : `scale(${scale})` }}>
                         Place Your<br />Bias Here
                     </div>
                 </div>

@@ -15,9 +15,9 @@ export default function AdminPage() {
     const [password, setPassword] = useState('');
 
     // Editor State
-    const [themeTitle, setThemeTitle] = useState(MOCK_THEME);
-    const [axisLabels, setAxisLabels] = useState(MOCK_AXIS);
-    const [dockItems, setDockItems] = useState<AnimeItem[]>(MOCK_ANIME_LIST);
+    const [themeTitle, setThemeTitle] = useState('');
+    const [axisLabels, setAxisLabels] = useState({ top: '', bottom: '', left: '', right: '' });
+    const [dockItems, setDockItems] = useState<AnimeItem[]>([]);
     const [newAnime, setNewAnime] = useState<{ id?: string, title: string, imageUrl: string, year: number }>({ id: '', title: '', imageUrl: '', year: 2024 });
 
     // History State
@@ -124,12 +124,22 @@ export default function AdminPage() {
         return () => subscription.unsubscribe();
     }, []);
 
-    // Fetch history when authenticated
+    // Fetch history and Active Theme when authenticated
     useEffect(() => {
         if (isAuthenticated) {
             fetchHistory();
+            fetchActiveTheme();
         }
     }, [isAuthenticated]);
+
+    const fetchActiveTheme = async () => {
+        // Find the currently active theme
+        const { data: activeTheme } = await supabase.from('themes').select('id').eq('is_active', true).single();
+        if (activeTheme) {
+            setSelectedHistoryId(activeTheme.id);
+            await loadThemeHistory(activeTheme.id);
+        }
+    };
 
     // --- Auth Helpers ---
 
@@ -544,25 +554,17 @@ export default function AdminPage() {
                     </div>
                 </header>
 
-                <div
-                    className="flex-1 relative overflow-hidden flex flex-col"
-                    style={{
-                        backgroundImage: 'radial-gradient(#374151 1px, transparent 1px)',
-                        backgroundSize: '24px 24px'
-                    }}
-                >
-                    {/* Render Grid in non-interactive or semi-interactive mode just to show axes */}
-                    <div className="flex-1 overflow-hidden p-8 flex items-center justify-center">
-                        <div className="w-full max-w-[1200px] h-[600px] relative border border-dashed border-gray-700 rounded-xl bg-gray-900/30">
-                            {/* Axis Visualization using formatting from Grid */}
-                            <div className="absolute top-4 left-1/2 -translate-x-1/2 text-xs font-bold text-gray-400 bg-gray-900 px-2 py-1 rounded border border-gray-700">{axisLabels.top} ▲</div>
-                            <div className="absolute bottom-4 left-1/2 -translate-x-1/2 text-xs font-bold text-gray-400 bg-gray-900 px-2 py-1 rounded border border-gray-700">▼ {axisLabels.bottom}</div>
-                            <div className="absolute left-4 top-1/2 -translate-y-1/2 text-xs font-bold text-gray-400 bg-gray-900 px-2 py-1 rounded border border-gray-700">◀ {axisLabels.left}</div>
-                            <div className="absolute right-4 top-1/2 -translate-y-1/2 text-xs font-bold text-gray-400 bg-gray-900 px-2 py-1 rounded border border-gray-700">{axisLabels.right} ▶</div>
-                            <div className="absolute inset-0 flex items-center justify-center text-gray-600 pointer-events-none">
-                                Grid Area (Items drop here)
-                            </div>
-                        </div>
+                <div className="flex-1 relative overflow-hidden flex flex-col bg-stone-950">
+                    <div className="flex-1 overflow-hidden flex items-center justify-center bg-stone-950">
+                        <AnimeGrid
+                            items={[]}
+                            layout={[]}
+                            onLayoutChange={() => { }}
+                            onRemoveItem={() => { }}
+                            onDrop={() => { }}
+                            axisLabels={axisLabels}
+                            scale={0.75}
+                        />
                     </div>
                 </div>
 
