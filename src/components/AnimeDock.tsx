@@ -7,9 +7,10 @@ import Image from 'next/image';
 
 interface AnimeDockProps {
     items: AnimeItem[];
+    onDragStartMobile?: (item: AnimeItem, e: React.TouchEvent) => void;
 }
 
-export default function AnimeDock({ items }: AnimeDockProps) {
+export default function AnimeDock({ items, onDragStartMobile }: AnimeDockProps) {
     return (
         <div className="w-full h-48 bg-gray-900 border-t border-gray-800 flex flex-col">
             <div className="px-4 py-2 border-b border-gray-800 bg-gray-950">
@@ -25,7 +26,15 @@ export default function AnimeDock({ items }: AnimeDockProps) {
                             e.dataTransfer.setData("text/plain", ""); // Required for some browsers to allow dropping
                             e.dataTransfer.effectAllowed = "copyMove";
                         }}
-                        className="flex-shrink-0 w-32 h-full bg-gray-800 rounded-lg border border-gray-700 overflow-hidden relative group hover:scale-105 transition-transform cursor-grab active:cursor-grabbing"
+                        onTouchStart={(e) => {
+                            // Only if single touch and we have a handler
+                            if (e.touches.length === 1 && onDragStartMobile) {
+                                // e.preventDefault(); // Might interfere with scrolling if not dragging?
+                                // Let parent decide prevention or handle it
+                                onDragStartMobile(item, e);
+                            }
+                        }}
+                        className="flex-shrink-0 w-32 h-full bg-gray-800 rounded-lg border border-gray-700 overflow-hidden relative group hover:scale-105 transition-transform cursor-grab active:cursor-grabbing touch-none"
                     >
                         <div className="relative w-full h-[80%]">
                             <Image

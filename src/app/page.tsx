@@ -8,6 +8,7 @@ import { AnimeItem } from '@/lib/mockData';
 import { supabase } from '@/lib/supabase';
 import { ChevronUp, ChevronDown, Download, Plus, Minus, Eye, EyeOff } from 'lucide-react';
 import { toCanvas } from 'html-to-image';
+import { resolveLayout } from '@/lib/gridUtils';
 
 export default function Home() {
   const [themeTitle, setThemeTitle] = useState('');
@@ -36,6 +37,11 @@ export default function Home() {
   const isPanningRef = useRef(false);
   const startMouseRef = useRef({ x: 0, y: 0 });
   const startPanRef = useRef({ x: 0, y: 0 });
+
+  // Mobile Dock Dragging State
+  const [draggingDockItem, setDraggingDockItem] = useState<AnimeItem | null>(null);
+  const [dragOverlayPos, setDragOverlayPos] = useState({ x: 0, y: 0 });
+  const dragItemRef = useRef<AnimeItem | null>(null); // Ref for event handlers to access current item without closure issues
 
   const GRID_SIZE = 1000;
 
@@ -108,6 +114,131 @@ export default function Home() {
     isPanningRef.current = false;
     if (gridContainerRef.current) {
       gridContainerRef.current.style.cursor = 'grab';
+    }
+  };
+
+  // Touch Panning Handlers
+  const handleTouchStart = (e: React.TouchEvent) => {
+    // Ignore if touching a card or interactive element (or if we are dragging a dock item)
+    if ((e.target as HTMLElement).closest('.anime-grid-card') || (e.target as HTMLElement).closest('.react-resizable-handle') || draggingDockItem) return;
+
+    // We only care about single touch for panning
+    if (e.touches.length === 1) {
+      isPanningRef.current = true;
+      startMouseRef.current = { x: e.touches[0].pageX, y: e.touches[0].pageY };
+      startPanRef.current = { x: pan.x, y: pan.y };
+    }
+  };
+
+  const handleTouchMove = (e: React.TouchEvent) => {
+    if (!isPanningRef.current || e.touches.length !== 1) return;
+    // e.preventDefault(); // handled by style touch-action usually, or allow scroll if vertical? 
+    // Actually we want to PAN the grid, so we want to generic scroll? 
+    // The grid is overflow-hidden, so native scroll is disabled. We implement custom pan.
+
+    const deltaX = e.touches[0].pageX - startMouseRef.current.x;
+    const deltaY = e.touches[0].pageY - startMouseRef.current.y;
+
+    const rawX = startPanRef.current.x + deltaX;
+    const rawY = startPanRef.current.y + deltaY;
+
+    setPan(getClampedPan(rawX, rawY, zoomLevel));
+  };
+
+  const handleTouchEnd = () => {
+    isPanningRef.current = false;
+  };
+
+  // Mobile Dock Drag Handlers
+  const handleDockItemTouchStart = (item: AnimeItem, e: React.TouchEvent) => {
+    // Prevent default to stop scrolling/refresh etc
+    // e.preventDefault(); // React event cannot be prevented async, but we can try? 
+    // Actually, better to just set state.
+
+    dragItemRef.current = item;
+    setDraggingDockItem(item);
+    setDragOverlayPos({ x: e.touches[0].clientX, y: e.touches[0].clientY });
+
+    // Add global listeners for the move/end phase
+    window.addEventListener('touchmove', handleDockItemTouchMove, { passive: false });
+    window.addEventListener('touchend', handleDockItemTouchEnd);
+  };
+
+  const handleDockItemTouchMove = (e: TouchEvent) => {
+    e.preventDefault(); // Critical to stop scrolling while dragging
+    if (e.touches.length > 0) {
+      setDragOverlayPos({ x: e.touches[0].clientX, y: e.touches[0].clientY });
+    }
+  };
+
+  const handleDockItemTouchEnd = (e: TouchEvent) => {
+    // Remove listeners
+    window.removeEventListener('touchmove', handleDockItemTouchMove);
+    window.removeEventListener('touchend', handleDockItemTouchEnd);
+
+    const item = dragItemRef.current;
+    setDraggingDockItem(null);
+    dragItemRef.current = null;
+
+    if (!item || !gridContainerRef.current) return;
+
+    const touch = e.changedTouches[0];
+    const clientX = touch.clientX;
+    const clientY = touch.clientY;
+
+    const gridRect = gridContainerRef.current.getBoundingClientRect();
+
+    // Check if dropped inside grid container
+    if (
+      clientX >= gridRect.left &&
+      clientX <= gridRect.right &&
+      clientY >= gridRect.top &&
+      clientY <= gridRect.bottom
+    ) {
+      // Calculate conversion to Grid Coordinates
+      // Formula: GridCenter + (ScreenPos - ScreenCenter - Pan) / Zoom
+      const screenCenterX = gridRect.width / 2;
+      const screenCenterY = gridRect.height / 2;
+
+      const gridCenterX = GRID_SIZE / 2; // 500
+      const gridCenterY = GRID_SIZE / 2; // 500
+
+      // Delta from screen center
+      const deltaX = clientX - gridRect.left - screenCenterX;
+      const deltaY = clientY - gridRect.top - screenCenterY;
+
+      // Apply zoom & pan to get grid-relative coordinates
+      const x = gridCenterX + (deltaX - pan.x) / zoomLevel;
+      const y = gridCenterY + (deltaY - pan.y) / zoomLevel;
+
+      // Logic to add item
+      const newLayoutId = `${item.id}-${Date.now()}`;
+      const newItem = { ...item, layoutId: newLayoutId };
+
+      // New Grid Item
+      const gridItemParams: Layout = {
+        i: newLayoutId,
+        x: Math.max(0, x - 30), // Center
+        y: Math.max(0, y - 30),
+        w: 60,
+        h: 60,
+        isResizable: false
+      };
+
+      // Update State
+      setDockItems(prev => prev.filter(i => i.id !== item.id));
+      setGridItems(prev => [...prev, newItem]);
+
+      // We need to resolve layout collision.
+      // We can't easily access the LATEST 'layout' state inside this closure if it changed.
+      // But layout connects to state.
+      // Instead of using 'layout' directly (which might be stale), we should probably trust it hasn't changed much?
+      // Or use a ref for layout? 
+      // For now, assume single user interaction.
+
+      setLayout(prevLayout => {
+        return resolveLayout([...prevLayout, gridItemParams], gridItemParams);
+      });
     }
   };
 
@@ -444,21 +575,22 @@ export default function Home() {
   if (!mounted) return <div className="min-h-screen bg-gray-950 text-white flex items-center justify-center">Loading...</div>;
 
   return (
-    <main className="flex h-screen flex-col bg-stone-950 text-stone-200 overflow-hidden font-sans selection:bg-orange-500/30 relative">
+    <main className="flex h-[100dvh] flex-col bg-stone-950 text-stone-200 overflow-hidden font-sans selection:bg-orange-500/30 relative">
       {/* Header */}
-      <header className="h-16 px-6 bg-stone-900/80 backdrop-blur-md border-b border-stone-800 flex justify-between items-center z-50 shadow-lg shrink-0 relative">
-        {/* Left: Logo Placeholder */}
-        <div className="flex items-center justify-center w-[88px] h-14 bg-stone-800 rounded-md border border-stone-700 overflow-hidden shrink-0 hover:border-stone-500 transition-colors cursor-pointer relative">
+      <header className="h-16 bg-stone-900/80 backdrop-blur-md border-b border-stone-800 z-50 shadow-lg shrink-0 relative">
+        {/* Left: Logo Placeholder - Hidden on mobile */}
+        {/* Left: Logo Placeholder - Hidden on mobile */}
+        <div className="hidden md:flex absolute left-6 top-1/2 -translate-y-1/2 items-center justify-center w-[88px] h-14 bg-stone-800 rounded-md border border-stone-700 overflow-hidden shrink-0 hover:border-stone-500 transition-colors cursor-pointer">
           <span className="text-[10px] text-stone-500 font-bold">550x350</span>
         </div>
 
         {/* Center: Theme Title (No Gradient, Clean) */}
-        <h1 className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 text-xl font-bold text-stone-100 tracking-wide">
+        <h1 className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 text-lg md:text-xl font-bold text-stone-100 tracking-wide whitespace-nowrap overflow-hidden text-ellipsis max-w-[150px] md:max-w-none">
           {themeTitle}
         </h1>
 
         {/* Right: Export Button */}
-        <div className="flex items-center gap-3">
+        <div className="absolute right-6 top-1/2 -translate-y-1/2 flex items-center gap-3">
           <button
             onClick={() => setShowAxisLabels(!showAxisLabels)}
             className="flex items-center gap-2 px-3 py-2 bg-stone-800 hover:bg-stone-700 text-stone-200 rounded-lg text-sm font-bold shadow-md transition-all active:scale-95 border border-stone-700"
@@ -469,25 +601,29 @@ export default function Home() {
 
           <button
             onClick={handleExport}
-            className="flex items-center gap-2 px-4 py-2 bg-stone-100 hover:bg-white text-stone-900 rounded-lg text-sm font-bold shadow-md hover:shadow-lg transition-all active:scale-95"
+            className="flex items-center gap-2 px-3 md:px-4 py-2 bg-stone-100 hover:bg-white text-stone-900 rounded-lg text-sm font-bold shadow-md hover:shadow-lg transition-all active:scale-95"
           >
             <Download size={16} />
-            Save Image
+            <span className="hidden md:inline">Save Image</span>
           </button>
         </div>
       </header>
 
       {/* Main Content - Grid Area */}
       <div
-        className={`flex-1 relative bg-stone-950 cursor-grab active:cursor-grabbing scrollbar-hide ${isItemDragging ? 'overflow-hidden' : 'overflow-hidden'}`} // Force hidden on container
+        className={`flex-1 relative bg-stone-950 cursor-grab active:cursor-grabbing scrollbar-hide touch-none ${isItemDragging ? 'overflow-hidden' : 'overflow-hidden'}`} // Force hidden on container
         ref={gridContainerRef}
         onMouseDown={handleMouseDown}
         onMouseMove={handleMouseMove}
         onMouseUp={handleMouseUp}
         onMouseLeave={handleMouseUp}
+        // Touch Handlers
+        onTouchStart={handleTouchStart}
+        onTouchMove={handleTouchMove}
+        onTouchEnd={handleTouchEnd}
         style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }} // Hide Scrollbar
       >
-        <div className="flex items-center justify-center min-w-full min-h-full">
+        <div className="absolute inset-0 flex items-center justify-center">
           <AnimeGrid
             items={gridItems}
             layout={layout}
@@ -505,6 +641,44 @@ export default function Home() {
           />
         </div>
       </div>
+
+      {/* Sticky Axis Labels (Top, Left, Right) */}
+      {showAxisLabels && (
+        <>
+          {/* Top */}
+          <div className="fixed top-20 left-1/2 -translate-x-1/2 z-40 pointer-events-none">
+            <span className="font-bold text-gray-400 bg-gray-900/90 px-3 py-1 rounded-full border border-gray-700 shadow-lg backdrop-blur-sm whitespace-nowrap">
+              {axisLabels.top} ▲
+            </span>
+          </div>
+
+          {/* Left */}
+          <div className="fixed left-4 top-1/2 -translate-y-1/2 z-40 pointer-events-none">
+            <span className="block font-bold text-gray-400 bg-gray-900/90 px-3 py-1 rounded-2xl md:rounded-full border border-gray-700 shadow-lg backdrop-blur-sm max-w-[80px] md:max-w-none text-center whitespace-normal md:whitespace-nowrap leading-tight">
+              ◀ {axisLabels.left}
+            </span>
+          </div>
+
+          {/* Right */}
+          <div className="fixed right-4 top-1/2 -translate-y-1/2 z-40 pointer-events-none">
+            <span className="block font-bold text-gray-400 bg-gray-900/90 px-3 py-1 rounded-2xl md:rounded-full border border-gray-700 shadow-lg backdrop-blur-sm max-w-[80px] md:max-w-none text-center whitespace-normal md:whitespace-nowrap leading-tight">
+              {axisLabels.right} ▶
+            </span>
+          </div>
+        </>
+      )}
+
+      {/* Bottom Axis Label - Sticky to Screen */}
+      {showAxisLabels && (
+        <div
+          className="fixed left-1/2 -translate-x-1/2 z-40 pointer-events-none transition-all duration-500 ease-in-out"
+          style={{ bottom: isDockOpen ? '220px' : '24px' }}
+        >
+          <span className="font-bold text-gray-400 bg-gray-900/90 px-3 py-1 rounded-full border border-gray-700 shadow-lg backdrop-blur-sm whitespace-nowrap">
+            ▼ {axisLabels.bottom}
+          </span>
+        </div>
+      )}
 
       {/* Zoom Controls */}
       <div className="fixed top-24 right-8 flex flex-col gap-2 z-50">
@@ -547,9 +721,23 @@ export default function Home() {
 
         {/* Dock Content */}
         <div className="w-full h-full bg-gray-900/90 backdrop-blur-2xl border border-gray-700/50 shadow-2xl rounded-2xl overflow-hidden ring-1 ring-white/10">
-          <AnimeDock items={dockItems} />
+          <AnimeDock items={dockItems} onDragStartMobile={handleDockItemTouchStart} />
         </div>
       </div>
+
+      {/* Mobile Drag Overlay */}
+      {draggingDockItem && (
+        <div
+          className="fixed pointer-events-none z-[100] w-20 h-20 rounded-lg overflow-hidden border-2 border-blue-500 shadow-xl opacity-80"
+          style={{
+            left: dragOverlayPos.x,
+            top: dragOverlayPos.y,
+            transform: 'translate(-50%, -50%)'
+          }}
+        >
+          <img src={draggingDockItem.imageUrl} className="w-full h-full object-cover" alt="dragging" />
+        </div>
+      )}
     </main>
   );
 }

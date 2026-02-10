@@ -4,4 +4,5 @@ export interface Layout {
     y: number;
     w: number;
     h: number;
+    isResizable?: boolean;
 }
