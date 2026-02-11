@@ -120,8 +120,8 @@ const DraggableGridItem = ({
                 ref={nodeRef}
                 className={`group absolute bg-gray-800 rounded-none border border-gray-700 overflow-visible shadow-none ${isExport ? '' : 'hover:shadow-md cursor-move'} transition-shadow anime-grid-card touch-none`}
                 style={{
-                    width: '60px',
-                    height: '60px',
+                    width: '100px',
+                    height: '100px',
                     left: 0,
                     position: 'absolute'
                 }}
@@ -149,13 +149,13 @@ const DraggableGridItem = ({
                             onBlur={handleTagSubmit}
                             onKeyDown={handleTagKeyDown}
                             onMouseDown={(e) => e.stopPropagation()}
-                            className="bg-black/90 text-white text-[10px] px-2 py-1 rounded border border-blue-500 outline-none text-center w-24 shadow-lg"
+                            className="bg-black/90 text-white text-[12px] px-2 py-1 rounded border border-blue-500 outline-none text-center w-24 shadow-lg"
                             placeholder="Tag..."
                         />
                     </div>
                 ) : (
                     item.tag && (
-                        <div className="absolute -bottom-6 left-1/2 -translate-x-1/2 bg-black/80 text-white text-[10px] px-1.5 py-0.5 rounded whitespace-nowrap z-50 pointer-events-none shadow-sm">
+                        <div className="absolute -bottom-6 left-1/2 -translate-x-1/2 bg-black/80 text-white text-[12px] px-1.5 py-0.5 rounded whitespace-nowrap z-50 pointer-events-none shadow-sm">
                             {item.tag}
                         </div>
                     )
@@ -283,10 +283,10 @@ export default function AnimeGrid({ items, layout, onLayoutChange, onRemoveItem,
 
         const layoutItem: Layout = {
             i: '__dropping_elem__', // handled by parent
-            x: Math.max(0, x - 30), // Center (60/2)
-            y: Math.max(0, y - 30),
-            w: 60,
-            h: 60
+            x: Math.max(0, x - 50), // Center (100/2)
+            y: Math.max(0, y - 50),
+            w: 100,
+            h: 100
         };
 
         if (onDrop) {

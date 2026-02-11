@@ -218,10 +218,10 @@ export default function Home() {
       // New Grid Item
       const gridItemParams: Layout = {
         i: newLayoutId,
-        x: Math.max(0, x - 30), // Center
-        y: Math.max(0, y - 30),
-        w: 60,
-        h: 60,
+        x: Math.max(0, x - 50), // Center
+        y: Math.max(0, y - 50),
+        w: 100,
+        h: 100,
         isResizable: false
       };
 
@@ -388,8 +388,11 @@ export default function Home() {
       // Canvas Settings
       const GRID_SIZE = 1000;
       const HEADER_HEIGHT = 150;
-      const WIDTH = 1000;
-      const HEIGHT = GRID_SIZE + HEADER_HEIGHT; // 1150px
+      const SIDE_PADDING = 20; // Minimal padding for labels/numbers at edges
+      const BOTTOM_PADDING = 20; // Minimal padding for bottom label/number
+
+      const WIDTH = GRID_SIZE + (SIDE_PADDING * 2);
+      const HEIGHT = GRID_SIZE + HEADER_HEIGHT + BOTTOM_PADDING;
 
       canvas.width = WIDTH;
       canvas.height = HEIGHT;
@@ -411,11 +414,26 @@ export default function Home() {
       ctx.shadowColor = 'transparent'; // Reset shadow
 
       // 3. Grid Area Offset
-      ctx.translate(0, HEADER_HEIGHT);
+      // Center the grid in the canvas
+      const gridOriginX = SIDE_PADDING;
+      const gridOriginY = HEADER_HEIGHT;
 
-      // Clip to grid area for safety
+      ctx.translate(gridOriginX, gridOriginY);
+
+      // --- START CLIPPED REGION (Grid Content Only) ---
+      // We clip everything to the grid area now, including labels if they were outside (but now they are inside)
+      // Actually, if we want labels INSIDE, we don't strictly need to clip them out, but standard grid clip is fine.
+      ctx.save();
+
       ctx.beginPath();
-      ctx.rect(0, 0, GRID_SIZE, GRID_SIZE);
+      // Allow drawing slightly outside grid (e.g. for numbers) by not strict clipping?
+      // No, user wants specifically the numbers at the edges to show. Those are drawn INSIDE the loop at pos=0 or pos=1000.
+      // Text drawing might bleed slightly. Let's expand clip slightly or just clip strictly to grid?
+      // User said "little bit of room".
+      // Let's clip to GRID_SIZE but usually text rendering *at* 0 might get cut if left-aligned.
+      // The numbers are centered. '100' at x=1000 will extend to x=1010.
+      // So we should expand the clip rect slightly.
+      ctx.rect(-20, -20, GRID_SIZE + 40, GRID_SIZE + 40); // Expand clip logic
       ctx.clip();
 
       // 4. Draw Grid Lines (Background visual)
@@ -438,28 +456,7 @@ export default function Home() {
         ctx.stroke();
       }
 
-      // 5. Draw Axis Lines (Blue Center Lines)
-      ctx.strokeStyle = 'rgba(96, 165, 250, 0.8)'; // blue-400/80
-      ctx.lineWidth = 2;
-      ctx.shadowColor = 'rgba(96, 165, 250, 0.5)';
-      ctx.shadowBlur = 10;
-
-      // Vertical Axis
-      ctx.beginPath();
-      ctx.moveTo(GRID_SIZE / 2, 0);
-      ctx.lineTo(GRID_SIZE / 2, GRID_SIZE);
-      ctx.stroke();
-
-      // Horizontal Axis
-      ctx.beginPath();
-      ctx.moveTo(0, GRID_SIZE / 2);
-      ctx.lineTo(GRID_SIZE, GRID_SIZE / 2);
-      ctx.stroke();
-
-      ctx.shadowColor = 'transparent';
-
-      // 6. Draw Anime Items
-      // We need to load images first.
+      // 5. Draw Anime Items
       const imageLoadPromises = gridItems.map(async (item) => {
         const layoutItem = layout.find(l => l.i === item.layoutId);
         if (!layoutItem) return;
@@ -468,7 +465,7 @@ export default function Home() {
         img.crossOrigin = 'anonymous'; // Crucial for CORS
         img.src = item.imageUrl;
 
-        await new Promise((resolve, reject) => {
+        await new Promise((resolve) => {
           img.onload = resolve;
           img.onerror = () => {
             console.warn(`Failed to load image for ${item.title}`);
@@ -480,16 +477,35 @@ export default function Home() {
       });
 
       const loadedImages = await Promise.all(imageLoadPromises);
-
       // Draw images in order
       loadedImages.forEach(data => {
         if (!data) return;
         const { img, x, y, tag } = data;
-        const ITEM_SIZE = 60; // 60px fixed
+        const ITEM_SIZE = 100; // 100px fixed (5x5 grids)
 
-        // Draw Image
+        // Draw Image with object-fit: cover behavior
         try {
-          ctx.drawImage(img, x, y, ITEM_SIZE, ITEM_SIZE);
+          // Calculate aspect ratio
+          const imgRatio = img.width / img.height;
+          const targetRatio = 1; // Square 100x100
+
+          let sx = 0, sy = 0, sWidth = img.width, sHeight = img.height;
+
+          if (imgRatio > targetRatio) {
+            // Image is wider than target: Crop width (center)
+            sHeight = img.height;
+            sWidth = sHeight * targetRatio;
+            sx = (img.width - sWidth) / 2;
+            sy = 0;
+          } else {
+            // Image is taller than target: Crop height (center)
+            sWidth = img.width;
+            sHeight = sWidth / targetRatio;
+            sx = 0;
+            sy = (img.height - sHeight) / 2;
+          }
+
+          ctx.drawImage(img, sx, sy, sWidth, sHeight, x, y, ITEM_SIZE, ITEM_SIZE);
         } catch (e) {
           ctx.fillStyle = '#333';
           ctx.fillRect(x, y, ITEM_SIZE, ITEM_SIZE);
@@ -502,7 +518,7 @@ export default function Home() {
 
         // Draw Tag if exists
         if (tag) {
-          ctx.font = '10px sans-serif';
+          ctx.font = '12px sans-serif';
           ctx.textAlign = 'center';
           ctx.textBaseline = 'top';
 
@@ -513,7 +529,7 @@ export default function Home() {
 
           // Tag Background
           ctx.fillStyle = 'rgba(0, 0, 0, 0.8)';
-          ctx.fillRect(tagX - textWidth / 2 - padding, tagY, textWidth + padding * 2, 14);
+          ctx.fillRect(tagX - textWidth / 2 - padding, tagY, textWidth + padding * 2, 18);
 
           // Tag Text
           ctx.fillStyle = '#ffffff';
@@ -521,9 +537,90 @@ export default function Home() {
         }
       });
 
-      // 7. Draw Axis Labels (Top, Bottom, Left, Right)
-      // Reset Shadow
+      ctx.restore();
+      // --- END CLIPPED REGION ---
+
+      // 6. Draw Axis Lines (Blue Center Lines)
+      ctx.strokeStyle = 'rgba(96, 165, 250, 0.8)'; // blue-400/80
+      ctx.lineWidth = 2;
+      ctx.shadowColor = 'rgba(96, 165, 250, 0.5)';
+      ctx.shadowBlur = 10;
+
+      // Vertical Axis (Y-Axis Line)
+      ctx.beginPath();
+      ctx.moveTo(GRID_SIZE / 2, 0);
+      ctx.lineTo(GRID_SIZE / 2, GRID_SIZE);
+      ctx.stroke();
+
+      // Horizontal Axis (X-Axis Line)
+      ctx.beginPath();
+      ctx.moveTo(0, GRID_SIZE / 2);
+      ctx.lineTo(GRID_SIZE, GRID_SIZE / 2);
+      ctx.stroke();
+
       ctx.shadowColor = 'transparent';
+
+      // 6.5 Draw Ticks and Grid Numbers (10-unit intervals)
+      ctx.fillStyle = 'rgba(147, 197, 253, 0.8)'; // blue-300/80 text
+      ctx.strokeStyle = 'rgba(96, 165, 250, 0.6)'; // blue-400/60 line
+      ctx.lineWidth = 1;
+      ctx.font = 'bold 10px monospace';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+
+      for (let i = 0; i <= 20; i++) {
+        const value = -100 + (i * 10);
+        if (value === 0) continue; // Skip center 0
+
+        // Calculate Position on Grid (0 to 1000)
+        // i goes 0..20. i=10 is center.
+        // pos = (i / 20) * GRID_SIZE
+        const pos = (i / 20) * GRID_SIZE;
+        const center = GRID_SIZE / 2;
+
+        // --- X-Axis Ticks (Vertical marks on horizontal line) ---
+        // x = pos, y = center
+        ctx.beginPath();
+        ctx.moveTo(pos, center - 6);
+        ctx.lineTo(pos, center + 6);
+        ctx.stroke();
+
+        // X-Axis Number (Below)
+        ctx.fillText(Math.abs(value).toString(), pos, center + 16);
+
+        // --- Y-Axis Ticks (Horizontal marks on vertical line) ---
+        // x = center, y = pos (Note: top is -100? No, usually top is Y-. Check CSS logic)
+        // In CSS: topPercent = 50 - (value / 2). 
+        // If val=100, top=0. So top is POSITIVE Y? No, top of screen is Y=0.
+        // Wait, "Theme" usually implies Top is Good/High? Or Top is Y+?
+        // Let's look at `AnimeGrid.tsx`:
+        // value = -100..+100.
+        // topPercent = 50 - (value / 2). if val=100 -> 0%. Top.
+        // topPercent = 50 - (-100 / 2) -> 100%. Bottom.
+        // So +100 is at Top (y=0). -100 is at Bottom (y=1000).
+        // My loop `pos` goes 0..1000. 
+        // i=0 -> val=-100. pos=0. This means -100 is at TOP? 
+        // NO. `(i/20)*GRID_SIZE` means i=0 is 0px (Top).
+        // But logic says -100 is Bottom.
+        // So for Y axis, we need to invert or map correctly.
+
+        // Let's use the explicit math from CSS:
+        // topPercent = 50 - (value / 2).
+        // yPos = (topPercent / 100) * GRID_SIZE
+        const yPosIdx = (50 - (value / 2)) / 100 * GRID_SIZE;
+
+        ctx.beginPath();
+        ctx.moveTo(center - 6, yPosIdx);
+        ctx.lineTo(center + 6, yPosIdx);
+        ctx.stroke();
+
+        // Y-Axis Number (Right)
+        ctx.textAlign = 'left';
+        ctx.fillText(Math.abs(value).toString(), center + 12, yPosIdx);
+        ctx.textAlign = 'center'; // Reset
+      }
+
+      // 7. Draw Axis Labels (Inside Grid)
       ctx.font = 'bold 14px sans-serif';
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
@@ -537,30 +634,64 @@ export default function Home() {
         // Pill Background
         ctx.fillStyle = 'rgba(17, 24, 39, 0.9)'; // gray-900/90
         ctx.strokeStyle = '#374151'; // gray-700
+        ctx.lineWidth = 1;
 
         // Pill Shape
         ctx.beginPath();
-        ctx.roundRect(x - width / 2, y - height / 2, width, height, 14);
+        if (typeof ctx.roundRect === 'function') {
+          ctx.roundRect(x - width / 2, y - height / 2, width, height, 14);
+        } else {
+          // Fallback for older browsers
+          ctx.rect(x - width / 2, y - height / 2, width, height);
+        }
         ctx.fill();
         ctx.stroke();
 
-        // Text
         ctx.fillStyle = '#9ca3af'; // gray-400
         ctx.fillText(text, x, y);
       };
 
-      // Top
-      drawLabel(`${axisLabels.top} ▲`, GRID_SIZE / 2, 20);
-      // Bottom
-      drawLabel(`▼ ${axisLabels.bottom}`, GRID_SIZE / 2, GRID_SIZE - 20);
-      // Left
-      drawLabel(`◀ ${axisLabels.left}`, 60, GRID_SIZE / 2);
+      // Top (Inside, Top Center)
+      drawLabel(`${axisLabels.top} ▲`, GRID_SIZE / 2, 30);
+      // Bottom (Inside, Bottom Center)
+      drawLabel(`▼ ${axisLabels.bottom}`, GRID_SIZE / 2, GRID_SIZE - 30);
+      // Left (Inside, Left Center, avoiding axis line)
+      drawLabel(`◀ ${axisLabels.left}`, 80, GRID_SIZE / 2 - 30);
 
-      // Right
-      drawLabel(`${axisLabels.right} ▶`, GRID_SIZE - 60, GRID_SIZE / 2);
+      // Right (Inside, Right Center, avoiding axis line)
+      drawLabel(`${axisLabels.right} ▶`, GRID_SIZE - 80, GRID_SIZE / 2 - 30);
 
-      // 8. Export
-      const dataUrl = canvas.toDataURL('image/webp', 1.0);
+      // 8. Export with Scaling
+      // Create a temporary canvas for scaling
+      const outputCanvas = document.createElement('canvas');
+      const outputCtx = outputCanvas.getContext('2d');
+
+      if (!outputCtx) {
+        // Fallback to original size if context fails
+        const dataUrl = canvas.toDataURL('image/webp', 1.0);
+        const link = document.createElement('a');
+        link.download = `${themeTitle ? themeTitle.replace(/\s+/g, '_') : 'anime_bias_grid'}.webp`;
+        link.href = dataUrl;
+        link.click();
+        return;
+      }
+
+      // Target Width: 800px
+      // Calculate Scale Factor
+      const TARGET_WIDTH = 800;
+      const scaleFactor = TARGET_WIDTH / WIDTH;
+      const TARGET_HEIGHT = HEIGHT * scaleFactor;
+
+      outputCanvas.width = TARGET_WIDTH;
+      outputCanvas.height = TARGET_HEIGHT;
+
+      // Draw original canvas onto scaled canvas
+      // Use high quality image smoothing
+      outputCtx.imageSmoothingEnabled = true;
+      outputCtx.imageSmoothingQuality = 'high';
+      outputCtx.drawImage(canvas, 0, 0, TARGET_WIDTH, TARGET_HEIGHT);
+
+      const dataUrl = outputCanvas.toDataURL('image/webp', 0.95); // High quality WebP
       const link = document.createElement('a');
       link.download = `${themeTitle ? themeTitle.replace(/\s+/g, '_') : 'anime_bias_grid'}.webp`;
       link.href = dataUrl;
