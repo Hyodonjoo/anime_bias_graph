@@ -5,6 +5,7 @@ import { supabase } from '@/lib/supabase';
 import AnimeGrid from '@/components/AnimeGrid';
 import AnimeDock from '@/components/AnimeDock';
 import { AnimeItem, MOCK_AXIS, MOCK_THEME, MOCK_ANIME_LIST } from '@/lib/mockData';
+import { ChevronUp, ChevronDown, Download, Eye, EyeOff } from 'lucide-react';
 
 
 export default function AdminPage() {
@@ -26,8 +27,63 @@ export default function AdminPage() {
 
     // Preview State
     const [refreshPreview, setRefreshPreview] = useState(0);
+    const [previewDockOpen, setPreviewDockOpen] = useState(true);
+
+    // Preview Grid State
+    const [gridItems, setGridItems] = useState<(AnimeItem & { layoutId: string })[]>([]);
+    const [layout, setLayout] = useState<any[]>([]); // Using any for Layout to avoid import issues for now, or I'll add import in next step
 
     // --- Helper Functions ---
+
+    // Preview Grid Handlers
+    const handlePreviewDrop = (layout: any[], layoutItem: any, _event: any) => {
+        // e is a native ResizeObserver entry?? No, in RGL onDrop, the third arg is the Event.
+        const event = _event as DragEvent;
+        const data = event.dataTransfer?.getData("application/json");
+        // Fallback for different drag data types if needed
+        const itemDataString = data || event.dataTransfer?.getData("text/plain");
+
+        if (!itemDataString) return;
+
+        try {
+            const itemData = JSON.parse(itemDataString);
+
+            // Avoid duplicates if needed, but logic says move from dock to grid
+            setDockItems(prev => prev.filter(i => i.id !== itemData.id));
+
+            const newLayoutId = `${itemData.id}-${Date.now()}`;
+            const newGridItem = { ...itemData, layoutId: newLayoutId };
+
+            setGridItems(prev => [...prev, newGridItem]);
+
+            // Update Layout
+            const newLayoutItem = {
+                ...layoutItem,
+                i: newLayoutId,
+                isResizable: false
+            };
+
+            setLayout(prev => [...prev, newLayoutItem]);
+
+        } catch (e) {
+            console.error("Failed to parse drop data", e);
+        }
+    };
+
+    const handlePreviewLayoutChange = (newLayout: any[]) => {
+        setLayout(newLayout);
+    };
+
+    const handleRemoveItemFromGrid = (layoutId: string) => {
+        const itemToRemove = gridItems.find(i => i.layoutId === layoutId);
+        if (!itemToRemove) return;
+
+        const { layoutId: _, ...cleanedItem } = itemToRemove;
+
+        setGridItems(prev => prev.filter(i => i.layoutId !== layoutId));
+        setDockItems(prev => [...prev, cleanedItem]); // Return to dock
+        setLayout(prev => prev.filter(l => l.i !== layoutId));
+    };
 
     const fetchHistory = async () => {
         if (!isAuthenticated) return;
@@ -370,7 +426,7 @@ export default function AdminPage() {
                 <div>
                     <div className="flex justify-between items-center mb-6">
                         <h2 className="text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-purple-400 to-pink-400">
-                            Theme Editor
+                            주제 관리
                         </h2>
                         <button
                             onClick={handleLogout}
@@ -382,7 +438,7 @@ export default function AdminPage() {
 
                     {/* History */}
                     <div className="mb-6 p-4 bg-gray-900 rounded border border-gray-800">
-                        <label className="text-xs text-gray-400 uppercase font-semibold block mb-2">Load From History</label>
+                        <label className="text-xs text-gray-400 uppercase font-semibold block mb-2">주제 목록</label>
                         <div className="flex gap-2">
                             <select
                                 className="flex-1 bg-gray-950 border border-gray-700 rounded p-2 text-sm"
@@ -411,7 +467,7 @@ export default function AdminPage() {
 
                     {/* Theme Title */}
                     <div className="space-y-2">
-                        <label className="text-sm text-gray-400">Theme Title</label>
+                        <label className="text-sm text-gray-400">주제</label>
                         <input
                             value={themeTitle}
                             onChange={(e) => setThemeTitle(e.target.value)}
@@ -422,22 +478,22 @@ export default function AdminPage() {
 
                 {/* Axis Config */}
                 <div>
-                    <h3 className="text-sm font-semibold text-gray-400 uppercase tracking-wider mb-4 border-b border-gray-800 pb-2">Axis Configuration</h3>
+                    <h3 className="text-sm font-semibold text-gray-400 uppercase tracking-wider mb-4 border-b border-gray-800 pb-2">축 설정</h3>
                     <div className="grid grid-cols-1 gap-4">
                         <div>
-                            <label className="text-xs text-blue-400 mb-1 block">Top Label (Y+)</label>
+                            <label className="text-xs text-blue-400 mb-1 block">상단 축값 (Y+)</label>
                             <input value={axisLabels.top} onChange={e => setAxisLabels({ ...axisLabels, top: e.target.value })} className="w-full bg-gray-950 border border-gray-800 rounded p-2 text-sm" />
                         </div>
                         <div>
-                            <label className="text-xs text-blue-400 mb-1 block">Bottom Label (Y-)</label>
+                            <label className="text-xs text-blue-400 mb-1 block">하단 축값 (Y-)</label>
                             <input value={axisLabels.bottom} onChange={e => setAxisLabels({ ...axisLabels, bottom: e.target.value })} className="w-full bg-gray-950 border border-gray-800 rounded p-2 text-sm" />
                         </div>
                         <div>
-                            <label className="text-xs text-green-400 mb-1 block">Left Label (X-)</label>
+                            <label className="text-xs text-green-400 mb-1 block">좌측 축값 (X-)</label>
                             <input value={axisLabels.left} onChange={e => setAxisLabels({ ...axisLabels, left: e.target.value })} className="w-full bg-gray-950 border border-gray-800 rounded p-2 text-sm" />
                         </div>
                         <div>
-                            <label className="text-xs text-green-400 mb-1 block">Right Label (X+)</label>
+                            <label className="text-xs text-green-400 mb-1 block">우측 축값 (X+)</label>
                             <input value={axisLabels.right} onChange={e => setAxisLabels({ ...axisLabels, right: e.target.value })} className="w-full bg-gray-950 border border-gray-800 rounded p-2 text-sm" />
                         </div>
                     </div>
@@ -445,20 +501,21 @@ export default function AdminPage() {
 
                 {/* Anime Manager */}
                 <div className="flex-1">
-                    <h3 className="text-sm font-semibold text-gray-400 uppercase tracking-wider mb-4 border-b border-gray-800 pb-2">Anime List ({dockItems.length})</h3>
+                    <h3 className="text-sm font-semibold text-gray-400 uppercase tracking-wider mb-4 border-b border-gray-800 pb-2">애니 목록 ({dockItems.length})</h3>
 
                     {/* Add New / Edit */}
                     <div className="p-4 bg-gray-900 rounded border border-gray-800 mb-4 space-y-3">
                         <div className="flex justify-between items-center mb-2">
                             <span className="text-xs font-bold text-gray-400">
-                                {newAnime.id ? 'Edit Anime' : 'Add New Anime'}
+                                {newAnime.id ? '애니 수정' : '애니 추가'}
                             </span>
                             {newAnime.id && (
+
                                 <button
                                     onClick={() => setNewAnime({ id: '', title: '', imageUrl: '', year: 2024 })}
                                     className="text-xs text-gray-500 hover:text-white"
                                 >
-                                    Cancel Edit
+                                    수정 취소
                                 </button>
                             )}
                         </div>
@@ -526,50 +583,113 @@ export default function AdminPage() {
                             onClick={handleUpdateTheme}
                             className="w-full bg-gray-800 hover:bg-gray-700 py-3 rounded-lg font-bold text-white shadow-lg transition-all border border-gray-600"
                         >
-                            Update Existing Theme
+                            주제 업데이트
                         </button>
                     )}
                     <button
                         onClick={handlePublish}
                         className="w-full bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-500 hover:to-purple-500 py-3 rounded-lg font-bold text-white shadow-lg transition-all active:scale-95"
                     >
-                        Publish as New Theme
+                        주제 추가
                     </button>
                 </div>
             </div>
 
             {/* Right: Preview Area */}
-            <div className="flex-1 flex flex-col bg-black relative">
-                <div className="absolute top-4 right-4 z-50 bg-yellow-500/20 text-yellow-500 px-3 py-1 rounded text-xs font-mono border border-yellow-500/50">
-                    LIVE PREVIEW MODE
+            {/* Right: Preview Area */}
+            <div className="flex-1 flex flex-col bg-stone-950 relative overflow-hidden selection:bg-orange-500/30">
+                <div className="absolute top-20 right-4 z-50 bg-yellow-500/20 text-yellow-500 px-3 py-1 rounded text-xs font-mono border border-yellow-500/50 pointer-events-none">
+                    사용자 화면 미리보기
                 </div>
 
-                {/* Re-use the exact layout from home page for fidelity */}
-                <header className="h-16 px-6 bg-gray-900/80 backdrop-blur-md border-b border-gray-800 flex justify-between items-center z-20 shrink-0 pointer-events-none opacity-80">
-                    <div className="flex items-center gap-4">
-                        <div className="w-2 h-8 bg-gradient-to-b from-blue-500 to-purple-600 rounded-full"></div>
-                        <h1 className="text-xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-blue-400 via-purple-400 to-pink-400">
-                            {themeTitle}
-                        </h1>
+                {/* Simulated Header */}
+                <header className="absolute top-0 left-0 right-0 h-16 bg-stone-900/80 backdrop-blur-md border-b border-stone-800 z-20 flex justify-between items-center px-6 select-none shadow-lg">
+                    {/* Left: Placeholder */}
+                    <div className="w-[88px] h-14 bg-stone-800 rounded-md border border-stone-700 shrink-0 opacity-50 flex items-center justify-center pointer-events-none">
+                        <span className="text-[10px] text-stone-500 font-bold">550x350</span>
+                    </div>
+
+                    {/* Center: Title */}
+                    <h1 className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 text-lg font-bold text-stone-100 tracking-wide max-w-[200px] truncate pointer-events-none">
+                        {themeTitle || 'Theme Title'}
+                    </h1>
+
+                    {/* Right: Mock Buttons */}
+                    <div className="flex items-center gap-3">
+                        <button
+                            className="flex items-center gap-2 px-3 py-2 bg-stone-800 text-stone-200 rounded-lg text-sm font-bold shadow-md border border-stone-700 opacity-80 cursor-not-allowed"
+                            title="Mock Button"
+                        >
+                            <Eye size={16} />
+                        </button>
+
+                        <button
+                            className="flex items-center gap-2 px-3 py-2 bg-stone-100 text-stone-900 rounded-lg text-sm font-bold shadow-md opacity-80 cursor-not-allowed"
+                        >
+                            <Download size={16} />
+                            <span className="hidden md:inline">Save Image</span>
+                        </button>
                     </div>
                 </header>
 
-                <div className="flex-1 relative overflow-hidden flex flex-col bg-stone-950">
-                    <div className="flex-1 overflow-hidden flex items-center justify-center bg-stone-950">
-                        <AnimeGrid
-                            items={[]}
-                            layout={[]}
-                            onLayoutChange={() => { }}
-                            onRemoveItem={() => { }}
-                            onDrop={() => { }}
-                            axisLabels={axisLabels}
-                            scale={0.75}
-                        />
-                    </div>
+                {/* Main Content Area */}
+                <div className="flex-1 relative overflow-hidden flex items-center justify-center bg-stone-950">
+                    <AnimeGrid
+                        items={gridItems}
+                        layout={layout}
+                        onLayoutChange={handlePreviewLayoutChange}
+                        onRemoveItem={handleRemoveItemFromGrid}
+                        onDrop={handlePreviewDrop}
+                        axisLabels={axisLabels}
+                        scale={0.85}
+                        showAxisLabels={true}
+                        dockId="anime-dock-preview"
+                    />
                 </div>
 
-                <div className="h-48 z-30 bg-gray-900/95 border-t border-gray-800 shrink-0">
-                    <AnimeDock items={dockItems} />
+                {/* Simulated Sticky Axis Labels */}
+                <div className="absolute top-20 left-1/2 -translate-x-1/2 z-10 pointer-events-none">
+                    <span className="font-bold text-gray-400 bg-gray-900/90 px-3 py-1 rounded-full border border-gray-700 shadow-lg backdrop-blur-sm whitespace-nowrap text-xs">
+                        {axisLabels.top} ▲
+                    </span>
+                </div>
+                <div className="absolute left-4 top-1/2 -translate-y-1/2 z-10 pointer-events-none">
+                    <span className="block font-bold text-gray-400 bg-gray-900/90 px-3 py-1 rounded-full border border-gray-700 shadow-lg backdrop-blur-sm text-center whitespace-nowrap text-xs">
+                        ◀ {axisLabels.left}
+                    </span>
+                </div>
+                <div className="absolute right-4 top-1/2 -translate-y-1/2 z-10 pointer-events-none">
+                    <span className="block font-bold text-gray-400 bg-gray-900/90 px-3 py-1 rounded-full border border-gray-700 shadow-lg backdrop-blur-sm text-center whitespace-nowrap text-xs">
+                        {axisLabels.right} ▶
+                    </span>
+                </div>
+
+                {/* Bottom Label - Dynamic Position */}
+                <div
+                    className="absolute left-1/2 -translate-x-1/2 z-10 pointer-events-none transition-all duration-500 ease-in-out"
+                    style={{ bottom: previewDockOpen ? '14rem' : '2rem' }}
+                >
+                    <span className="font-bold text-gray-400 bg-gray-900/90 px-3 py-1 rounded-full border border-gray-700 shadow-lg backdrop-blur-sm whitespace-nowrap text-xs">
+                        ▼ {axisLabels.bottom}
+                    </span>
+                </div>
+
+                {/* Floating Dock Preview - Interactive */}
+                <div
+                    id="anime-dock-preview"
+                    className={`absolute left-1/2 -translate-x-1/2 w-[90%] h-48 z-30 transition-all duration-500 ease-in-out ${previewDockOpen ? 'bottom-6' : '-bottom-[11rem]'}`}
+                >
+                    {/* Toggle Handle */}
+                    <button
+                        onClick={() => setPreviewDockOpen(!previewDockOpen)}
+                        className="absolute -top-10 right-8 h-10 px-6 bg-gray-800/90 hover:bg-gray-700 backdrop-blur-md border border-gray-600/50 rounded-lg flex items-center justify-center gap-2 text-gray-400 hover:text-white transition-all shadow-[0_-5px_15px_rgba(0,0,0,0.3)] z-50 cursor-pointer"
+                    >
+                        {previewDockOpen ? <ChevronDown size={20} /> : <ChevronUp size={20} />}
+                    </button>
+
+                    <div className="w-full h-full bg-gray-900/90 backdrop-blur-2xl border border-gray-700/50 shadow-2xl rounded-2xl overflow-hidden ring-1 ring-white/10 pointer-events-auto">
+                        <AnimeDock items={dockItems} />
+                    </div>
                 </div>
             </div>
         </div>

@@ -14,7 +14,7 @@ export default function AnimeDock({ items, onDragStartMobile }: AnimeDockProps) 
     return (
         <div className="w-full h-48 bg-gray-900 border-t border-gray-800 flex flex-col">
             <div className="px-4 py-2 border-b border-gray-800 bg-gray-950">
-                <h3 className="text-sm font-semibold text-gray-400">Available Anime</h3>
+                <h3 className="text-sm font-semibold text-gray-400">애니메이션 목록</h3>
             </div>
             <div className="flex-1 overflow-x-auto overflow-y-hidden p-4 flex gap-4 scrollbar-thin scrollbar-thumb-gray-700 scrollbar-track-transparent">
                 {items.map((item) => (
