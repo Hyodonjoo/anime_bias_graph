@@ -5,6 +5,7 @@ import Draggable, { DraggableEventHandler, DraggableData, DraggableEvent } from 
 import { AnimeItem } from '@/lib/mockData';
 import Image from 'next/image';
 import { Layout } from '@/types/layout';
+import { resolveLayout, collides } from '@/lib/gridUtils';
 
 interface AnimeGridProps {
     items: (AnimeItem & { layoutId: string })[];
@@ -117,10 +118,10 @@ const DraggableGridItem = ({
         >
             <div
                 ref={nodeRef}
-                className={`group absolute bg-gray-800 rounded-none border border-gray-700 overflow-visible shadow-none ${isExport ? '' : 'hover:shadow-md cursor-move'} transition-shadow anime-grid-card`}
+                className={`group absolute bg-gray-800 rounded-none border border-gray-700 overflow-visible shadow-none ${isExport ? '' : 'hover:shadow-md cursor-move'} transition-shadow anime-grid-card touch-none`}
                 style={{
-                    width: '60px',
-                    height: '60px',
+                    width: '100px',
+                    height: '100px',
                     left: 0,
                     position: 'absolute'
                 }}
@@ -148,13 +149,13 @@ const DraggableGridItem = ({
                             onBlur={handleTagSubmit}
                             onKeyDown={handleTagKeyDown}
                             onMouseDown={(e) => e.stopPropagation()}
-                            className="bg-black/90 text-white text-[10px] px-2 py-1 rounded border border-blue-500 outline-none text-center w-24 shadow-lg"
+                            className="bg-black/90 text-white text-[12px] px-2 py-1 rounded border border-blue-500 outline-none text-center w-24 shadow-lg"
                             placeholder="Tag..."
                         />
                     </div>
                 ) : (
                     item.tag && (
-                        <div className="absolute -bottom-6 left-1/2 -translate-x-1/2 bg-black/80 text-white text-[10px] px-1.5 py-0.5 rounded whitespace-nowrap z-50 pointer-events-none shadow-sm">
+                        <div className="absolute -bottom-6 left-1/2 -translate-x-1/2 bg-black/80 text-white text-[12px] px-1.5 py-0.5 rounded whitespace-nowrap z-50 pointer-events-none shadow-sm">
                             {item.tag}
                         </div>
                     )
@@ -164,7 +165,7 @@ const DraggableGridItem = ({
                 {!isExport && (
                     <div
                         onClick={handleStartEdit}
-                        className="absolute -top-2 -right-2 w-5 h-5 bg-blue-500 hover:bg-blue-400 text-white rounded-full flex items-center justify-center cursor-pointer opacity-0 group-hover:opacity-100 transition-opacity shadow-sm z-50"
+                        className="absolute -top-2 -right-2 w-5 h-5 bg-blue-500 hover:bg-blue-400 text-white rounded-full flex items-center justify-center cursor-pointer opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity shadow-sm z-50"
                         title="Edit Tag"
                     >
                         <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
@@ -177,15 +178,8 @@ const DraggableGridItem = ({
     );
 };
 
-// Helper: Check intersection
-const collides = (r1: Layout, r2: Layout) => {
-    return !(
-        r1.x + r1.w <= r2.x ||
-        r1.x >= r2.x + r2.w ||
-        r1.y + r1.h <= r2.y ||
-        r1.y >= r2.y + r2.h
-    );
-};
+// Helper: Check intersection (Moved to gridUtils)
+// Helper: Check intersection (Moved to gridUtils)
 
 export default function AnimeGrid({ items, layout, onLayoutChange, onRemoveItem, onDrop, axisLabels, dockId, isDockOpen, scale = 1, onDragStateChange, onUpdateTag, isExport = false, offset = { x: 0, y: 0 }, showAxisLabels = true }: AnimeGridProps) {
     const [mounted, setMounted] = React.useState(false);
@@ -195,40 +189,6 @@ export default function AnimeGrid({ items, layout, onLayoutChange, onRemoveItem,
     React.useEffect(() => {
         setMounted(true);
     }, []);
-
-    const resolveLayout = (currentLayout: Layout[], movingItem: Layout): Layout[] => {
-        // Update layout mapping
-        let newLayout = currentLayout.map(l => l.i === movingItem.i ? movingItem : l);
-
-        // Simple cascade push
-        const itemsToProcess = [movingItem];
-        const processed = new Set<string>();
-
-        while (itemsToProcess.length > 0) {
-            const current = itemsToProcess.shift()!;
-            if (processed.has(current.i)) continue;
-            processed.add(current.i);
-
-            for (let i = 0; i < newLayout.length; i++) {
-                const other = newLayout[i];
-                if (other.i === current.i) continue;
-
-                // If collision
-                if (collides(current, other)) {
-                    // Push 'other' down
-                    // New Y = current.y + current.h
-                    const newY = current.y + current.h;
-
-                    if (other.y < newY) {
-                        const updatedOther = { ...other, y: newY };
-                        newLayout[i] = updatedOther;
-                        itemsToProcess.push(updatedOther);
-                    }
-                }
-            }
-        }
-        return newLayout;
-    };
 
     const handleItemDragStart = (id: string) => {
         setDraggingId(id);
@@ -312,18 +272,21 @@ export default function AnimeGrid({ items, layout, onLayoutChange, onRemoveItem,
         // Formula: GridCoord = Center + (ScreenCoord - ScreenCenter - Translate) / Scale
 
 
-        const centerX = rect.width / 2;
-        const centerY = rect.height / 2;
+        const domCenterX = rect.width / 2;
+        const domCenterY = rect.height / 2;
 
-        const x = centerX + (e.clientX - rect.left - centerX - offset.x) / scale;
-        const y = centerY + (e.clientY - rect.top - centerY - offset.y) / scale;
+        const logicalCenterX = 500; // GRID_SIZE / 2
+        const logicalCenterY = 500;
+
+        const x = logicalCenterX + (e.clientX - rect.left - domCenterX - offset.x) / scale;
+        const y = logicalCenterY + (e.clientY - rect.top - domCenterY - offset.y) / scale;
 
         const layoutItem: Layout = {
             i: '__dropping_elem__', // handled by parent
-            x: Math.max(0, x - 30), // Center (60/2)
-            y: Math.max(0, y - 30),
-            w: 60,
-            h: 60
+            x: Math.max(0, x - 50), // Center (100/2)
+            y: Math.max(0, y - 50),
+            w: 100,
+            h: 100
         };
 
         if (onDrop) {
@@ -351,7 +314,7 @@ export default function AnimeGrid({ items, layout, onLayoutChange, onRemoveItem,
         <div
             ref={containerRef}
             id={isExport ? "anime-grid-export" : "anime-grid-content"} // Different ID for export
-            className={`relative flex flex-col justify-between ${isExport ? '' : 'group/grid overflow-hidden'}`}
+            className={`relative flex flex-col justify-between shrink-0 ${isExport ? '' : 'group/grid overflow-hidden'}`}
             onDragOver={handleDragOver}
             onDrop={handleDropInternal}
             style={{
@@ -428,40 +391,7 @@ export default function AnimeGrid({ items, layout, onLayoutChange, onRemoveItem,
                     );
                 })}
             </div>
-            {/* Labels Layer - Restored inside Grid */}
-            {!isExport && showAxisLabels && (
-                <>
-                    {/* Top */}
-                    <div className="absolute top-4 left-1/2 -translate-x-1/2 z-50 pointer-events-none">
-                        <span className="font-bold text-gray-400 bg-gray-900/90 px-3 py-1 rounded-full border border-gray-700 shadow-lg backdrop-blur-sm whitespace-nowrap">
-                            {axisLabels.top} ▲
-                        </span>
-                    </div>
-
-                    {/* Left */}
-                    <div className="absolute left-4 top-1/2 -translate-y-1/2 z-50 pointer-events-none">
-                        <span className="block font-bold text-gray-400 bg-gray-900/90 px-3 py-1 rounded-full border border-gray-700 shadow-lg backdrop-blur-sm whitespace-nowrap">
-                            ◀ {axisLabels.left}
-                        </span>
-                    </div>
-
-                    {/* Right */}
-                    <div className="absolute right-4 top-1/2 -translate-y-1/2 z-50 pointer-events-none">
-                        <span className="block font-bold text-gray-400 bg-gray-900/90 px-3 py-1 rounded-full border border-gray-700 shadow-lg backdrop-blur-sm whitespace-nowrap">
-                            {axisLabels.right} ▶
-                        </span>
-                    </div>
-
-                    {/* Bottom */}
-                    <div className="absolute left-1/2 -translate-x-1/2 z-50 pointer-events-none transition-all duration-500 ease-in-out"
-                        style={{ bottom: isDockOpen ? 'calc(500px - 50vh + 310px)' : 'calc(500px - 50vh + 100px)' }}>
-                        <span className="font-bold text-gray-400 bg-gray-900/90 px-3 py-1 rounded-full border border-gray-700 shadow-lg backdrop-blur-sm whitespace-nowrap">
-                            ▼ {axisLabels.bottom}
-                        </span>
-                    </div>
-                </>
-            )}
-
+            {/* Labels Layer - Removed from Grid, moved to Page */}
             {/* Empty State */}
             {items.length === 0 && (
                 <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-0 data-hide-export" style={{ width: '100%', height: '100%' }}>
