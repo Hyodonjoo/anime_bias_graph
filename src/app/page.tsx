@@ -61,10 +61,13 @@ export default function Home() {
 
     // Use a small threshold for "1.0" to handle potential float precision issues (1.0 vs 1.0000001)
     if (scale < 1.01) {
-      // Strict Mode: When zoomed out or at 100%, lock strictly to center unless content overflows
-      // This prevents "moving screen when shrunk"
-      maxPanX = scaledGridW > containerW ? (scaledGridW - containerW) / 2 : 0;
-      maxPanY = scaledGridH > containerH ? (scaledGridH - containerH) / 2 : 0;
+      // Strict Mode: When zoomed out or at 100%
+      // X-Axis strict
+      maxPanX = scaledGridW > containerW ? (scaledGridW - containerW) / 2 : 10;
+
+      // Y-Axis: Allow buffer (Dock height ~200px + extra) so user can see bottom '100' label.
+      // E.g. (Overflow/2) + 10.
+      maxPanY = Math.max(0, (scaledGridH - containerH) / 2 + 20);
     } else {
       // Zoomed Mode: Allow panning to ensure edges are accessible
       // Increase BUFFER to 500 to allow pulling edges well into the screen even at 150%
@@ -707,35 +710,89 @@ export default function Home() {
 
   return (
     <main className="flex h-[100dvh] flex-col bg-stone-950 text-stone-200 overflow-hidden font-sans selection:bg-orange-500/30 relative">
-      {/* Header */}
-      <header className="h-16 bg-stone-900/80 backdrop-blur-md border-b border-stone-800 z-50 shadow-lg shrink-0 relative">
-        {/* Left: Logo Placeholder - Hidden on mobile */}
-        {/* Left: Logo Placeholder - Hidden on mobile */}
-        <div className="hidden md:flex absolute left-6 top-1/2 -translate-y-1/2 items-center justify-center w-[88px] h-14 bg-stone-800 rounded-md border border-stone-700 overflow-hidden shrink-0 hover:border-stone-500 transition-colors cursor-pointer">
-          <span className="text-[10px] text-stone-500 font-bold">550x350</span>
+      {/* Header - Premium Tech / Sleek Aerospace Style */}
+      <header className="h-20 bg-zinc-950 border-b border-white/5 z-50 shrink-0 relative overflow-hidden flex items-center justify-between px-8 shadow-2xl">
+        {/* Deep Atmosphere Background */}
+        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-blue-900/10 via-zinc-950 to-zinc-950 pointer-events-none"></div>
+        <div className="absolute inset-x-0 top-0 h-[1px] bg-gradient-to-r from-transparent via-white/10 to-transparent opacity-50"></div>
+
+        {/* Left: Identity */}
+        <div className="flex items-center gap-5 relative z-10 h-full">
+          <div className="relative group cursor-pointer">
+            <div className="absolute -inset-1 bg-gradient-to-r from-blue-600 to-violet-600 rounded-lg blur opacity-25 group-hover:opacity-75 transition duration-500"></div>
+            <div className="relative flex items-center justify-center w-10 h-10 bg-zinc-900 ring-1 ring-white/10 rounded-lg shadow-xl">
+              <div className="w-4 h-4 rounded-sm bg-gradient-to-br from-white to-gray-500 transform rotate-45 group-hover:rotate-90 transition-transform duration-500"></div>
+            </div>
+          </div>
+          <div className="flex flex-col">
+            <span className="text-sm font-bold text-gray-200 tracking-wide">ANIME BIAS</span>
+            <span className="text-[10px] font-medium text-gray-500 tracking-[0.2em] uppercase">Coordinate Grid</span>
+          </div>
+          {/* Vertical Separator */}
+          <div className="h-8 w-[1px] bg-white/5 ml-2"></div>
         </div>
 
-        {/* Center: Theme Title (No Gradient, Clean) */}
-        <h1 className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 text-lg md:text-xl font-bold text-stone-100 tracking-wide whitespace-nowrap overflow-hidden text-ellipsis max-w-[150px] md:max-w-none">
-          {themeTitle}
-        </h1>
+        {/* Center: Prominent Title Area */}
+        {/* Center: Prominent Title Area */}
+        <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-20 pointer-events-none flex flex-col items-center justify-center w-full max-w-3xl">
+          <style>
+            {`
+              @keyframes textShine {
+                0% { background-position: 0% 50%; }
+                100% { background-position: 200% 50%; }
+              }
+            `}
+          </style>
+          <div className="relative py-2 px-10 flex flex-col items-center">
+            {/* Background Glow */}
+            <div className="absolute inset-0 bg-blue-500/10 blur-2xl rounded-full opacity-0 md:opacity-100 transition-opacity"></div>
 
-        {/* Right: Export Button */}
-        <div className="absolute right-6 top-1/2 -translate-y-1/2 flex items-center gap-3">
+            <h1
+              className="relative text-2xl md:text-4xl font-black italic tracking-tighter text-transparent bg-clip-text drop-shadow-[0_0_25px_rgba(59,130,246,0.6)] text-center whitespace-nowrap z-10"
+              style={{
+                backgroundImage: 'linear-gradient(to right, #FFFFFF 20%, #60A5FA 40%, #A5B4FC 60%, #FFFFFF 80%)',
+                backgroundSize: '200% auto',
+                animation: 'textShine 3s linear infinite'
+              }}
+            >
+              {themeTitle || 'UNTITLED PROJECT'}
+            </h1>
+
+            {/* Decorative Energy Lines */}
+            <div className="flex items-center gap-2 mt-2 opacity-80">
+              <div className="h-[1px] w-12 bg-gradient-to-r from-transparent to-blue-400"></div>
+              <div className="h-1 w-1 bg-blue-400 rounded-full shadow-[0_0_5px_rgba(59,130,246,1)] animate-pulse"></div>
+              <div className="h-[1px] w-12 bg-gradient-to-l from-transparent to-blue-400"></div>
+            </div>
+          </div>
+        </div>
+
+        {/* Right: Modern Controls */}
+        <div className="flex items-center gap-3 relative z-10">
+          {/* Axis Toggle - Minimal Glass */}
           <button
             onClick={() => setShowAxisLabels(!showAxisLabels)}
-            className="flex items-center gap-2 px-3 py-2 bg-stone-800 hover:bg-stone-700 text-stone-200 rounded-lg text-sm font-bold shadow-md transition-all active:scale-95 border border-stone-700"
-            title={showAxisLabels ? "Hide Axis Labels" : "Show Axis Labels"}
+            className="flex items-center justify-center w-10 h-10 rounded-xl bg-white/5 hover:bg-white/10 border border-white/5 text-gray-400 hover:text-white transition-all hover:scale-105 active:scale-95 group"
+            title={showAxisLabels ? "Hide Labels" : "Show Labels"}
           >
-            {showAxisLabels ? <Eye size={16} /> : <EyeOff size={16} />}
+            {showAxisLabels ?
+              <Eye size={18} className="group-hover:drop-shadow-[0_0_8px_rgba(255,255,255,0.5)] transition-all" /> :
+              <EyeOff size={18} className="opacity-50" />
+            }
           </button>
 
+          {/* Export Button - High End Primary */}
           <button
             onClick={handleExport}
-            className="flex items-center gap-2 px-3 md:px-4 py-2 bg-stone-100 hover:bg-white text-stone-900 rounded-lg text-sm font-bold shadow-md hover:shadow-lg transition-all active:scale-95"
+            className="group relative flex items-center gap-3 pl-4 pr-5 py-2.5 bg-zinc-100 hover:bg-white text-zinc-900 rounded-xl text-sm font-bold shadow-[0_0_20px_rgba(255,255,255,0.1)] hover:shadow-[0_0_25px_rgba(255,255,255,0.3)] transition-all active:scale-95 overflow-hidden"
           >
-            <Download size={16} />
-            <span className="hidden md:inline">Save Image</span>
+            <div className="flex items-center justify-center w-5 h-5 rounded-full bg-zinc-900/10 group-hover:bg-zinc-900/20 transition-colors">
+              <Download size={12} className="text-zinc-900" />
+            </div>
+            <span className="tracking-wide">Save Image</span>
+
+            {/* Shimmer Effect */}
+            <div className="absolute top-0 left-0 w-full h-full bg-gradient-to-r from-transparent via-white/50 to-transparent -translate-x-[150%] skew-x-[-20deg] group-hover:animate-shimmer pointer-events-none"></div>
           </button>
         </div>
       </header>

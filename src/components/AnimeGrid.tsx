@@ -396,7 +396,7 @@ export default function AnimeGrid({ items, layout, onLayoutChange, onRemoveItem,
             {items.length === 0 && (
                 <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-0 data-hide-export" style={{ width: '100%', height: '100%' }}>
                     <div className="text-gray-600/50 text-4xl font-bold uppercase tracking-widest text-center" style={{ transform: isExport ? 'scale(1)' : `scale(${scale})` }}>
-                        Place Your<br />Bias Here
+                        여기에 애니메이션을<br />배치해주세요
                     </div>
                 </div>
             )}
