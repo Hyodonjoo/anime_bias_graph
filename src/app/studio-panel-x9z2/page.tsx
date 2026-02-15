@@ -230,7 +230,7 @@ export default function AdminPage() {
     };
 
     const handlePublish = async () => {
-        if (!confirm("Are you sure you want to publish this theme? This will update the live site.")) return;
+        if (!confirm("이 주제를 사이트에 적용하시겠습니까?")) return;
 
         try {
             // 1. Deactivate old themes
@@ -262,7 +262,7 @@ export default function AdminPage() {
                 if (itemsError) throw itemsError;
             }
 
-            alert("Successfully Published!");
+            alert("주제가 성공적으로 적용되었습니다!");
             fetchHistory();
         } catch (e: any) {
             alert("Error publishing: " + e.message);
@@ -272,7 +272,7 @@ export default function AdminPage() {
     // Update Existing Theme Function
     const handleUpdateTheme = async () => {
         if (!selectedHistoryId) return;
-        if (!confirm("Are you sure you want to overwrite this existing theme?")) return;
+        if (!confirm("이 주제를 수정하시겠습니까?")) return;
 
         try {
             // 1. Update Theme Info
@@ -302,17 +302,17 @@ export default function AdminPage() {
                 if (itemsError) throw itemsError;
             }
 
-            alert("Theme updated successfully!");
+            alert("주제가 성공적으로 수정되었습니다!");
             fetchHistory();
         } catch (e: any) {
-            alert("Error updating theme: " + e.message);
+            alert("주제 수정에 실패했습니다.");
         }
     };
 
     // Delete History
     const handleDeleteHistory = async () => {
         if (!selectedHistoryId) return;
-        if (!confirm("Are you sure you want to delete this theme history? This cannot be undone.")) return;
+        if (!confirm("이 주제를 삭제하시겠습니까?")) return;
 
         try {
             // 1. Delete anime items (Cascading delete handles this usually, but safe to be explicit if no cascade)
@@ -323,14 +323,14 @@ export default function AdminPage() {
             const { error: themeError } = await supabase.from('themes').delete().eq('id', selectedHistoryId);
             if (themeError) throw themeError;
 
-            alert("History deleted successfully.");
+            alert("주제가 삭제되었습니다.");
             setSelectedHistoryId('');
             fetchHistory(); // Refresh list
 
             // Reset editor if deleted theme was loaded
             // Optional: You might want to clear the editor or leave it as is.
         } catch (e: any) {
-            alert("Error deleting history: " + e.message);
+            alert("주제 삭제에 실패했습니다.");
         }
     };
 
@@ -590,7 +590,7 @@ export default function AdminPage() {
                         onClick={handlePublish}
                         className="w-full bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-500 hover:to-purple-500 py-3 rounded-lg font-bold text-white shadow-lg transition-all active:scale-95"
                     >
-                        주제 추가
+                        주제 적용
                     </button>
                 </div>
             </div>
@@ -602,32 +602,83 @@ export default function AdminPage() {
                     사용자 화면 미리보기
                 </div>
 
-                {/* Simulated Header */}
-                <header className="absolute top-0 left-0 right-0 h-16 bg-stone-900/80 backdrop-blur-md border-b border-stone-800 z-20 flex justify-between items-center px-6 select-none shadow-lg">
-                    {/* Left: Placeholder */}
-                    <div className="w-[88px] h-14 bg-stone-800 rounded-md border border-stone-700 shrink-0 opacity-50 flex items-center justify-center pointer-events-none">
-                        <span className="text-[10px] text-stone-500 font-bold">550x350</span>
+                <header className="relative w-full h-20 bg-zinc-950 border-b border-white/5 z-20 overflow-hidden flex items-center justify-between px-8 shadow-2xl shrink-0">
+                    {/* Deep Atmosphere Background */}
+                    <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-blue-900/10 via-zinc-950 to-zinc-950 pointer-events-none"></div>
+                    <div className="absolute inset-x-0 top-0 h-[1px] bg-gradient-to-r from-transparent via-white/10 to-transparent opacity-50"></div>
+
+                    {/* Left: Identity */}
+                    <div className="flex items-center gap-5 relative z-10 h-full">
+                        <div className="relative group cursor-pointer">
+                            <div className="absolute -inset-1 bg-gradient-to-r from-blue-600 to-violet-600 rounded-lg blur opacity-25 group-hover:opacity-75 transition duration-500"></div>
+                            <div className="relative flex items-center justify-center w-10 h-10 bg-zinc-900 ring-1 ring-white/10 rounded-lg shadow-xl">
+                                <div className="w-4 h-4 rounded-sm bg-gradient-to-br from-white to-gray-500 transform rotate-45 group-hover:rotate-90 transition-transform duration-500"></div>
+                            </div>
+                        </div>
+                        <div className="flex flex-col">
+                            <span className="text-sm font-bold text-gray-200 tracking-wide">ANIME BIAS</span>
+                            <span className="text-[10px] font-medium text-gray-500 tracking-[0.2em] uppercase">Coordinate Grid</span>
+                        </div>
+                        {/* Vertical Separator */}
+                        <div className="h-8 w-[1px] bg-white/5 ml-2"></div>
                     </div>
 
-                    {/* Center: Title */}
-                    <h1 className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 text-lg font-bold text-stone-100 tracking-wide max-w-[200px] truncate pointer-events-none">
-                        {themeTitle || 'Theme Title'}
-                    </h1>
+                    {/* Center: Prominent Title Area */}
+                    <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-20 pointer-events-none flex flex-col items-center justify-center w-full max-w-5xl">
+                        <style>
+                            {`
+                              @keyframes textShine {
+                                0% { background-position: 0% 50%; }
+                                100% { background-position: 200% 50%; }
+                              }
+                            `}
+                        </style>
+                        <div className="relative py-2 px-10 flex flex-col items-center">
+                            {/* Background Glow */}
+                            <div className="absolute inset-0 bg-blue-500/10 blur-2xl rounded-full opacity-0 md:opacity-100 transition-opacity"></div>
 
-                    {/* Right: Mock Buttons */}
-                    <div className="flex items-center gap-3">
+                            <h1
+                                className="relative text-2xl md:text-4xl font-black italic tracking-tighter text-transparent bg-clip-text drop-shadow-[0_0_25px_rgba(59,130,246,0.6)] text-center whitespace-nowrap z-10 px-4"
+                                style={{
+                                    backgroundImage: 'linear-gradient(to right, #FFFFFF 20%, #60A5FA 40%, #A5B4FC 60%, #FFFFFF 80%)',
+                                    backgroundSize: '200% auto',
+                                    animation: 'textShine 3s linear infinite'
+                                }}
+                            >
+                                {themeTitle || 'UNTITLED PROJECT'}
+                            </h1>
+
+                            {/* Decorative Energy Lines */}
+                            <div className="flex items-center gap-2 mt-2 opacity-80">
+                                <div className="h-[1px] w-12 bg-gradient-to-r from-transparent to-blue-400"></div>
+                                <div className="h-1 w-1 bg-blue-400 rounded-full shadow-[0_0_5px_rgba(59,130,246,1)] animate-pulse"></div>
+                                <div className="h-[1px] w-12 bg-gradient-to-l from-transparent to-blue-400"></div>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Right: Modern Controls */}
+                    <div className="flex items-center gap-3 relative z-10">
+                        {/* Axis Toggle - Minimal Glass */}
                         <button
-                            className="flex items-center gap-2 px-3 py-2 bg-stone-800 text-stone-200 rounded-lg text-sm font-bold shadow-md border border-stone-700 opacity-80 cursor-not-allowed"
-                            title="Mock Button"
+                            className="flex items-center justify-center w-10 h-10 rounded-xl bg-white/5 hover:bg-white/10 border border-white/5 text-gray-400 hover:text-white transition-all hover:scale-105 active:scale-95 group"
+                            title="Show Labels (Preview)"
                         >
-                            <Eye size={16} />
+                            <Eye size={18} className="group-hover:drop-shadow-[0_0_8px_rgba(255,255,255,0.5)] transition-all" />
                         </button>
 
+                        {/* Export Button - High End Primary */}
                         <button
-                            className="flex items-center gap-2 px-3 py-2 bg-stone-100 text-stone-900 rounded-lg text-sm font-bold shadow-md opacity-80 cursor-not-allowed"
+                            className="group relative flex items-center gap-3 pl-4 pr-5 py-2.5 bg-zinc-100 hover:bg-white text-zinc-900 rounded-xl text-sm font-bold shadow-[0_0_20px_rgba(255,255,255,0.1)] hover:shadow-[0_0_25px_rgba(255,255,255,0.3)] transition-all active:scale-95 overflow-hidden opacity-50 cursor-not-allowed"
+                            title="Save Image (Preview Only)"
                         >
-                            <Download size={16} />
-                            <span className="hidden md:inline">Save Image</span>
+                            <div className="flex items-center justify-center w-5 h-5 rounded-full bg-zinc-900/10 group-hover:bg-zinc-900/20 transition-colors">
+                                <Download size={12} className="text-zinc-900" />
+                            </div>
+                            <span className="tracking-wide">Save Image</span>
+
+                            {/* Shimmer Effect */}
+                            <div className="absolute top-0 left-0 w-full h-full bg-gradient-to-r from-transparent via-white/50 to-transparent -translate-x-[150%] skew-x-[-20deg] group-hover:animate-shimmer pointer-events-none"></div>
                         </button>
                     </div>
                 </header>

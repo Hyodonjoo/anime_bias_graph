@@ -733,8 +733,7 @@ export default function Home() {
         </div>
 
         {/* Center: Prominent Title Area */}
-        {/* Center: Prominent Title Area */}
-        <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-20 pointer-events-none flex flex-col items-center justify-center w-full max-w-3xl">
+        <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-20 pointer-events-none flex flex-col items-center justify-center w-full max-w-5xl">
           <style>
             {`
               @keyframes textShine {
@@ -748,7 +747,7 @@ export default function Home() {
             <div className="absolute inset-0 bg-blue-500/10 blur-2xl rounded-full opacity-0 md:opacity-100 transition-opacity"></div>
 
             <h1
-              className="relative text-2xl md:text-4xl font-black italic tracking-tighter text-transparent bg-clip-text drop-shadow-[0_0_25px_rgba(59,130,246,0.6)] text-center whitespace-nowrap z-10"
+              className="relative text-2xl md:text-4xl font-black italic tracking-tighter text-transparent bg-clip-text drop-shadow-[0_0_25px_rgba(59,130,246,0.6)] text-center whitespace-nowrap z-10 px-4"
               style={{
                 backgroundImage: 'linear-gradient(to right, #FFFFFF 20%, #60A5FA 40%, #A5B4FC 60%, #FFFFFF 80%)',
                 backgroundSize: '200% auto',
