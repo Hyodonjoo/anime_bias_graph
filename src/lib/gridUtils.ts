@@ -12,7 +12,7 @@ export const collides = (r1: Layout, r2: Layout) => {
 
 export const resolveLayout = (currentLayout: Layout[], movingItem: Layout): Layout[] => {
     // Update layout mapping
-    let newLayout = currentLayout.map(l => l.i === movingItem.i ? movingItem : l);
+    const newLayout = currentLayout.map(l => l.i === movingItem.i ? movingItem : l);
 
     // Simple cascade push
     const itemsToProcess = [movingItem];
