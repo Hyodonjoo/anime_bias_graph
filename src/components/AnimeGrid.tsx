@@ -181,7 +181,7 @@ const DraggableGridItem = ({
 // Helper: Check intersection (Moved to gridUtils)
 // Helper: Check intersection (Moved to gridUtils)
 
-export default function AnimeGrid({ items, layout, onLayoutChange, onRemoveItem, onDrop, axisLabels, dockId, isDockOpen, scale = 1, onDragStateChange, onUpdateTag, isExport = false, offset = { x: 0, y: 0 }, showAxisLabels = true }: AnimeGridProps) {
+export default function AnimeGrid({ items, layout, onLayoutChange, onRemoveItem, onDrop, dockId, scale = 1, onDragStateChange, onUpdateTag, isExport = false, offset = { x: 0, y: 0 } }: AnimeGridProps) {
     const [mounted, setMounted] = React.useState(false);
     const [draggingId, setDraggingId] = useState<string | null>(null);
     const containerRef = useRef<HTMLDivElement>(null);
@@ -190,10 +190,7 @@ export default function AnimeGrid({ items, layout, onLayoutChange, onRemoveItem,
         setMounted(true);
     }, []);
 
-    const handleItemDragStart = (id: string) => {
-        setDraggingId(id);
-        if (onDragStateChange) onDragStateChange(true);
-    };
+
 
     const handleItemDrag = (id: string, x: number, y: number) => {
         // ... (existing logic)
@@ -226,12 +223,11 @@ export default function AnimeGrid({ items, layout, onLayoutChange, onRemoveItem,
                 if (e instanceof MouseEvent) {
                     clientX = e.clientX;
                     clientY = e.clientY;
-                } else if ('changedTouches' in e && (e as any).changedTouches.length > 0) {
-                    // Cast to any or TouchEvent if strictly typed, but check presence
-                    clientX = (e as any).changedTouches[0].clientX;
-                    clientY = (e as any).changedTouches[0].clientY;
+                } else if ('changedTouches' in e && (e as TouchEvent).changedTouches.length > 0) {
+                    // Cast to TouchEvent if strictly typed, but check presence
+                    clientX = (e as TouchEvent).changedTouches[0].clientX;
+                    clientY = (e as TouchEvent).changedTouches[0].clientY;
                 }
-
                 if (clientX !== undefined && clientY !== undefined) {
                     if (
                         clientX >= dockRect.left &&
@@ -396,7 +392,7 @@ export default function AnimeGrid({ items, layout, onLayoutChange, onRemoveItem,
             {items.length === 0 && (
                 <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-0 data-hide-export" style={{ width: '100%', height: '100%' }}>
                     <div className="text-gray-600/50 text-4xl font-bold uppercase tracking-widest text-center" style={{ transform: isExport ? 'scale(1)' : `scale(${scale})` }}>
-                        Place Your<br />Bias Here
+                        여기에 애니메이션을<br />배치해주세요
                     </div>
                 </div>
             )}
