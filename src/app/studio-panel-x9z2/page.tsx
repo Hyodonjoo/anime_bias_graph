@@ -49,7 +49,8 @@ export default function AdminPage() {
             const itemData = JSON.parse(itemDataString);
 
             // Avoid duplicates if needed, but logic says move from dock to grid
-            setDockItems(prev => prev.filter(i => i.id !== itemData.id));
+            // For Admin Preview: DO NOT remove from dockItems. Just copy to grid.
+            // setDockItems(prev => prev.filter(i => i.id !== itemData.id)); // <-- Commented out to prevent removal
 
             const newLayoutId = `${itemData.id}-${Date.now()}`;
             const newGridItem = { ...itemData, layoutId: newLayoutId };
@@ -81,7 +82,7 @@ export default function AdminPage() {
         const { layoutId: _, ...cleanedItem } = itemToRemove;
 
         setGridItems(prev => prev.filter(i => i.layoutId !== layoutId));
-        setDockItems(prev => [...prev, cleanedItem]); // Return to dock
+        // setDockItems(prev => [...prev, cleanedItem]); // Do NOT add back to dock, it's already there (copy mode)
         setLayout(prev => prev.filter(l => l.i !== layoutId));
     };
 
@@ -180,24 +181,27 @@ export default function AdminPage() {
         return () => subscription.unsubscribe();
     }, []);
 
-    // Fetch history and Active Theme when authenticated
+    // Fetch history when authenticated (Removed fetchActiveTheme to default to "New")
     useEffect(() => {
         if (isAuthenticated) {
             fetchHistory();
-            fetchActiveTheme();
         }
     }, [isAuthenticated]);
 
-    const fetchActiveTheme = async () => {
-        // Find the currently active theme
-        const { data: activeTheme } = await supabase.from('themes').select('id').eq('is_active', true).single();
-        if (activeTheme) {
-            setSelectedHistoryId(activeTheme.id);
-            await loadThemeHistory(activeTheme.id);
-        }
+    // Resets the editor to "New Theme" state
+    const resetEditor = () => {
+        setThemeTitle('');
+        setAxisLabels({ top: '', bottom: '', left: '', right: '' });
+        setDockItems([]);
+        setSelectedHistoryId('');
+        setNewAnime({ id: '', title: '', imageUrl: '', year: 2024 });
+
+        // Update preview
+        setGridItems([]);
+        setLayout([]);
     };
 
-    // --- Auth Helpers ---
+    // --- Actions ---
 
     const handleLogin = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -211,7 +215,6 @@ export default function AdminPage() {
 
             if (error) throw error;
 
-            // Login successful
             if (data.user) {
                 setIsAuthenticated(true);
             }
@@ -229,27 +232,106 @@ export default function AdminPage() {
         setPassword('');
     };
 
-    const handlePublish = async () => {
-        if (!confirm("이 주제를 사이트에 적용하시겠습니까?")) return;
+    // 1. "주제 업데이트 및 적용" (Update & Apply)
+    // - If ID exists: Update DB & Set Active
+    // - If ID empty: Create New DB & Set Active
+    const handleUpdateAndApply = async () => {
+        if (!themeTitle.trim()) {
+            alert("주제 제목은 필수입니다.");
+            return;
+        }
+        if (!confirm("이 주제를 저장하고 사이트에 바로 적용하시겠습니까?")) return;
 
         try {
-            // 1. Deactivate old themes
-            await supabase.from('themes').update({ is_active: false }).neq('id', '00000000-0000-0000-0000-000000000000'); // safe update
+            let targetId = selectedHistoryId;
 
-            // 2. Insert new theme
+            if (targetId) {
+                // [UPDATE]
+                // 1. Deactivate all others (safety)
+                await supabase.from('themes').update({ is_active: false }).neq('id', targetId);
+
+                // 2. Update current theme and set Active
+                const { error: themeError } = await supabase.from('themes').update({
+                    title: themeTitle,
+                    axis_top: axisLabels.top,
+                    axis_bottom: axisLabels.bottom,
+                    axis_left: axisLabels.left,
+                    axis_right: axisLabels.right,
+                    is_active: true, // Apply
+                }).eq('id', targetId);
+
+                if (themeError) throw themeError;
+
+                // 3. Sync Items (Clear & Insert)
+                await supabase.from('anime_items').delete().eq('theme_id', targetId);
+
+            } else {
+                // [CREATE]
+                // 1. Deactivate all others
+                await supabase.from('themes').update({ is_active: false }).neq('id', '00000000-0000-0000-0000-000000000000');
+
+                // 2. Insert New
+                const { data: themeData, error: themeError } = await supabase.from('themes').insert({
+                    title: themeTitle,
+                    axis_top: axisLabels.top,
+                    axis_bottom: axisLabels.bottom,
+                    axis_left: axisLabels.left,
+                    axis_right: axisLabels.right,
+                    is_active: true, // Apply
+                    created_at: new Date().toISOString()
+                }).select().single();
+
+                if (themeError) throw themeError;
+                targetId = themeData.id;
+            }
+
+            // Insert Items (Common)
+            if (dockItems.length > 0 && targetId) {
+                const animeToInsert = dockItems.map(item => ({
+                    theme_id: targetId,
+                    title: item.title,
+                    image_url: item.imageUrl,
+                    year: item.year
+                }));
+
+                const { error: itemsError } = await supabase.from('anime_items').insert(animeToInsert);
+                if (itemsError) throw itemsError;
+            }
+
+            alert("성공적으로 저장 및 적용되었습니다!");
+            if (!selectedHistoryId) setSelectedHistoryId(targetId); // Switch to edit mode for the new ID
+            fetchHistory();
+
+        } catch (e: any) {
+            alert("작업 실패: " + e.message);
+        }
+    };
+
+    // 2. "새로운 주제 저장" (Save as New)
+    // - Always Create New DB
+    // - is_active = false (Just save draft)
+    const handleSaveAsNew = async () => {
+        if (!themeTitle.trim()) {
+            alert("주제 제목은 필수입니다.");
+            return;
+        }
+        if (!confirm("현재 내용을 새로운 주제로 저장하시겠습니까? (사이트엔 적용되지 않음)")) return;
+
+        try {
+            // 1. Insert New (is_active: false)
             const { data: themeData, error: themeError } = await supabase.from('themes').insert({
                 title: themeTitle,
                 axis_top: axisLabels.top,
                 axis_bottom: axisLabels.bottom,
                 axis_left: axisLabels.left,
                 axis_right: axisLabels.right,
-                is_active: true,
+                is_active: false, // Just Save
                 created_at: new Date().toISOString()
             }).select().single();
 
             if (themeError) throw themeError;
 
-            // 3. Insert anime items
+            // 2. Insert Items
             if (dockItems.length > 0) {
                 const animeToInsert = dockItems.map(item => ({
                     theme_id: themeData.id,
@@ -262,75 +344,37 @@ export default function AdminPage() {
                 if (itemsError) throw itemsError;
             }
 
-            alert("주제가 성공적으로 적용되었습니다!");
+            alert("새로운 주제로 저장되었습니다.");
+            // Optional: Switch to this new theme? Or stay?
+            // Usually "Save As" switches context.
+            setSelectedHistoryId(themeData.id);
             fetchHistory();
+
         } catch (e: any) {
-            alert("Error publishing: " + e.message);
-        }
-    };
-
-    // Update Existing Theme Function
-    const handleUpdateTheme = async () => {
-        if (!selectedHistoryId) return;
-        if (!confirm("이 주제를 수정하시겠습니까?")) return;
-
-        try {
-            // 1. Update Theme Info
-            const { error: themeError } = await supabase.from('themes').update({
-                title: themeTitle,
-                axis_top: axisLabels.top,
-                axis_bottom: axisLabels.bottom,
-                axis_left: axisLabels.left,
-                axis_right: axisLabels.right,
-            }).eq('id', selectedHistoryId);
-
-            if (themeError) throw themeError;
-
-            // 2. Sync Anime Items (Full Replacement Strategy)
-            // 2a. Delete old items
-            await supabase.from('anime_items').delete().eq('theme_id', selectedHistoryId);
-
-            // 2b. Insert new items
-            if (dockItems.length > 0) {
-                const animeToInsert = dockItems.map(item => ({
-                    theme_id: selectedHistoryId,
-                    title: item.title,
-                    image_url: item.imageUrl,
-                    year: item.year
-                }));
-                const { error: itemsError } = await supabase.from('anime_items').insert(animeToInsert);
-                if (itemsError) throw itemsError;
-            }
-
-            alert("주제가 성공적으로 수정되었습니다!");
-            fetchHistory();
-        } catch (e: any) {
-            alert("주제 수정에 실패했습니다.");
+            alert("저장 실패: " + e.message);
         }
     };
 
     // Delete History
     const handleDeleteHistory = async () => {
         if (!selectedHistoryId) return;
-        if (!confirm("이 주제를 삭제하시겠습니까?")) return;
+        if (!confirm("이 주제를 삭제하시겠습니까? 관련 데이터가 모두 사라집니다.")) return;
 
         try {
-            // 1. Delete anime items (Cascading delete handles this usually, but safe to be explicit if no cascade)
+            // 1. Delete associated anime items first
             const { error: itemsError } = await supabase.from('anime_items').delete().eq('theme_id', selectedHistoryId);
             if (itemsError) throw itemsError;
 
-            // 2. Delete theme
+            // 2. Delete the theme itself
             const { error: themeError } = await supabase.from('themes').delete().eq('id', selectedHistoryId);
             if (themeError) throw themeError;
 
             alert("주제가 삭제되었습니다.");
-            setSelectedHistoryId('');
-            fetchHistory(); // Refresh list
-
-            // Reset editor if deleted theme was loaded
-            // Optional: You might want to clear the editor or leave it as is.
+            resetEditor(); // Go back to New Mode
+            fetchHistory();
         } catch (e: any) {
-            alert("주제 삭제에 실패했습니다.");
+            console.error(e);
+            alert("주제 삭제에 실패했습니다: " + e.message);
         }
     };
 
@@ -443,14 +487,21 @@ export default function AdminPage() {
                             <select
                                 className="flex-1 bg-gray-950 border border-gray-700 rounded p-2 text-sm"
                                 onChange={(e) => {
-                                    setSelectedHistoryId(e.target.value);
-                                    loadThemeHistory(e.target.value);
+                                    const val = e.target.value;
+                                    if (!val) {
+                                        resetEditor();
+                                    } else {
+                                        setSelectedHistoryId(val);
+                                        loadThemeHistory(val);
+                                    }
                                 }}
                                 value={selectedHistoryId}
                             >
-                                <option value="">Select a previous theme...</option>
+                                <option value="">+ 새 주제 만들기 (Create New)</option>
                                 {historyThemes.map(h => (
-                                    <option key={h.id} value={h.id}>{h.title} ({new Date(h.created_at).toLocaleDateString()})</option>
+                                    <option key={h.id} value={h.id}>
+                                        {h.id === selectedHistoryId ? '✓ ' : ''}{h.title} ({new Date(h.created_at).toLocaleDateString()})
+                                    </option>
                                 ))}
                             </select>
                             {selectedHistoryId && (
@@ -467,10 +518,12 @@ export default function AdminPage() {
 
                     {/* Theme Title */}
                     <div className="space-y-2">
-                        <label className="text-sm text-gray-400">주제</label>
+                        <label className="text-sm text-gray-400">주제 (필수)</label>
                         <input
+                            required
                             value={themeTitle}
                             onChange={(e) => setThemeTitle(e.target.value)}
+                            placeholder="주제 제목을 입력하세요"
                             className="w-full bg-gray-950 border border-gray-800 rounded p-2 focus:ring-1 focus:ring-purple-500 outline-none transition-all"
                         />
                     </div>
@@ -578,24 +631,21 @@ export default function AdminPage() {
 
                 {/* Publish Actions */}
                 <div className="pt-4 border-t border-gray-800 sticky bottom-0 bg-gray-900/50 backdrop-blur pb-6 space-y-3">
-                    {selectedHistoryId && (
-                        <button
-                            onClick={handleUpdateTheme}
-                            className="w-full bg-gray-800 hover:bg-gray-700 py-3 rounded-lg font-bold text-white shadow-lg transition-all border border-gray-600"
-                        >
-                            주제 업데이트
-                        </button>
-                    )}
                     <button
-                        onClick={handlePublish}
+                        onClick={handleSaveAsNew}
+                        className="w-full bg-gray-800 hover:bg-gray-700 py-3 rounded-lg font-bold text-white shadow-lg transition-all border border-gray-600"
+                    >
+                        새로운 주제 저장 (비공개)
+                    </button>
+                    <button
+                        onClick={handleUpdateAndApply}
                         className="w-full bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-500 hover:to-purple-500 py-3 rounded-lg font-bold text-white shadow-lg transition-all active:scale-95"
                     >
-                        주제 적용
+                        {selectedHistoryId ? '주제 업데이트 및 적용' : '주제 추가 및 적용'}
                     </button>
                 </div>
             </div>
 
-            {/* Right: Preview Area */}
             {/* Right: Preview Area */}
             <div className="flex-1 flex flex-col bg-stone-950 relative overflow-hidden selection:bg-orange-500/30">
                 <div className="absolute top-20 right-4 z-50 bg-yellow-500/20 text-yellow-500 px-3 py-1 rounded text-xs font-mono border border-yellow-500/50 pointer-events-none">
