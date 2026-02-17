@@ -292,6 +292,23 @@ export default function Home() {
         right: themes.axis_right
       });
 
+      // Clean up old theme saves (delete previous layout info)
+      try {
+        const keysToRemove: string[] = [];
+        for (let i = 0; i < localStorage.length; i++) {
+          const key = localStorage.key(i);
+          if (key && key.startsWith('animebias_save_') && key !== `animebias_save_${themes.id}`) {
+            keysToRemove.push(key);
+          }
+        }
+        if (keysToRemove.length > 0) {
+          console.log('[Cleanup] Removing old theme saves:', keysToRemove);
+          keysToRemove.forEach(key => localStorage.removeItem(key));
+        }
+      } catch (e) {
+        console.warn('Cleanup failed:', e);
+      }
+
       // Check for local save first
       const saveKey = `animebias_save_${themes.id}`;
       const savedDataString = localStorage.getItem(saveKey);
