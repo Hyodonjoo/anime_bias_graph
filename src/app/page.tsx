@@ -27,6 +27,7 @@ export default function Home() {
   // Fixed layout state instead of responsive breakpoints
   const [layout, setLayout] = useState<Layout[]>([]);
   const [mounted, setMounted] = useState(false);
+  const [isDataLoaded, setIsDataLoaded] = useState(false);
   const [isItemDragging, setIsItemDragging] = useState(false);
   const [themeId, setThemeId] = useState<string | null>(null);
 
@@ -258,7 +259,8 @@ export default function Home() {
 
   // Auto-save to LocalStorage whenever state changes
   useEffect(() => {
-    if (!mounted || !themeId) return;
+    // Only save if mounted, themeId exists, AND data has finished initial loading
+    if (!mounted || !themeId || !isDataLoaded) return;
 
     const saveData = {
       gridItems,
@@ -267,7 +269,7 @@ export default function Home() {
     };
 
     localStorage.setItem(`animebias_save_${themeId}`, JSON.stringify(saveData));
-  }, [gridItems, layout, dockItems, themeId, mounted]);
+  }, [gridItems, layout, dockItems, themeId, mounted, isDataLoaded]);
 
 
   const fetchActiveTheme = async () => {
@@ -321,6 +323,7 @@ export default function Home() {
             setGridItems(savedData.gridItems);
             setLayout(savedData.layout);
             setDockItems(savedData.dockItems);
+            setIsDataLoaded(true);
             return; // Skip DB fetch if local save exists
           }
         } catch (e) {
@@ -343,6 +346,7 @@ export default function Home() {
         }));
         setDockItems(formattedItems);
       }
+      setIsDataLoaded(true);
 
     } catch (e) {
       console.error("Error fetching theme:", e);
