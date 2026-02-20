@@ -80,7 +80,7 @@ const DraggableGridItem = ({
         onStop(item.layoutId, data.x, data.y, e);
     };
 
-    const handleStartEdit = (e: React.MouseEvent) => {
+    const handleStartEdit = (e: React.MouseEvent | React.TouchEvent | React.PointerEvent) => {
         if (isExport) return;
         e.stopPropagation();
         e.preventDefault();
@@ -165,6 +165,8 @@ const DraggableGridItem = ({
                 {!isExport && (
                     <div
                         onClick={handleStartEdit}
+                        onTouchStart={handleStartEdit}
+                        onPointerDown={handleStartEdit}
                         className="absolute -top-2 -right-2 w-5 h-5 bg-blue-500 hover:bg-blue-400 text-white rounded-full flex items-center justify-center cursor-pointer opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity shadow-sm z-50"
                         title="Edit Tag"
                     >
