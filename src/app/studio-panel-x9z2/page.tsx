@@ -682,12 +682,12 @@ export default function AdminPage() {
                                 <div className="w-4 h-4 rounded-sm bg-gradient-to-br from-white to-gray-500 transform rotate-45 group-hover:rotate-90 transition-transform duration-500"></div>
                             </div>
                         </div>
-                        <div className="flex flex-col">
+                        <div className="hidden md:flex flex-col">
                             <span className="text-sm font-bold text-gray-200 tracking-wide">ANIME BIAS</span>
                             <span className="text-[10px] font-medium text-gray-500 tracking-[0.2em] uppercase">Coordinate Grid</span>
                         </div>
                         {/* Vertical Separator */}
-                        <div className="h-8 w-[1px] bg-white/5 ml-2"></div>
+                        <div className="hidden md:block h-8 w-[1px] bg-white/5 ml-2"></div>
                     </div>
 
                     {/* Center: Prominent Title Area */}
@@ -716,10 +716,10 @@ export default function AdminPage() {
                             </h1>
 
                             {/* Decorative Energy Lines */}
-                            <div className="flex items-center gap-2 mt-2 opacity-80">
-                                <div className="h-[1px] w-12 bg-gradient-to-r from-transparent to-blue-400"></div>
-                                <div className="h-1 w-1 bg-blue-400 rounded-full shadow-[0_0_5px_rgba(59,130,246,1)] animate-pulse"></div>
-                                <div className="h-[1px] w-12 bg-gradient-to-l from-transparent to-blue-400"></div>
+                            <div className="flex items-center gap-2 mt-2 opacity-80 justify-center w-full">
+                                <div className="h-[2px] w-[100px] md:w-[150px] min-w-[80px] shrink-0 bg-gradient-to-r from-transparent to-blue-400"></div>
+                                <div className="h-1.5 w-1.5 shrink-0 bg-blue-400 rounded-full shadow-[0_0_8px_rgba(59,130,246,1)] animate-pulse"></div>
+                                <div className="h-[2px] w-[100px] md:w-[150px] min-w-[80px] shrink-0 bg-gradient-to-l from-transparent to-blue-400"></div>
                             </div>
                         </div>
                     </div>
@@ -736,13 +736,13 @@ export default function AdminPage() {
 
                         {/* Export Button - High End Primary */}
                         <button
-                            className="group relative flex items-center gap-3 pl-4 pr-5 py-2.5 bg-zinc-100 hover:bg-white text-zinc-900 rounded-xl text-sm font-bold shadow-[0_0_20px_rgba(255,255,255,0.1)] hover:shadow-[0_0_25px_rgba(255,255,255,0.3)] transition-all active:scale-95 overflow-hidden opacity-50 cursor-not-allowed"
+                            className="group relative flex items-center justify-center gap-2 md:gap-3 w-10 h-10 md:w-auto md:h-auto md:pl-4 md:pr-5 md:py-2.5 bg-zinc-100 hover:bg-white text-zinc-900 rounded-xl text-sm font-bold shadow-[0_0_20px_rgba(255,255,255,0.1)] hover:shadow-[0_0_25px_rgba(255,255,255,0.3)] transition-all active:scale-95 overflow-hidden opacity-50 cursor-not-allowed"
                             title="Save Image (Preview Only)"
                         >
                             <div className="flex items-center justify-center w-5 h-5 rounded-full bg-zinc-900/10 group-hover:bg-zinc-900/20 transition-colors">
                                 <Download size={12} className="text-zinc-900" />
                             </div>
-                            <span className="tracking-wide">Save Image</span>
+                            <span className="hidden md:block tracking-wide shrink-0 whitespace-nowrap">Save Image</span>
 
                             {/* Shimmer Effect */}
                             <div className="absolute top-0 left-0 w-full h-full bg-gradient-to-r from-transparent via-white/50 to-transparent -translate-x-[150%] skew-x-[-20deg] group-hover:animate-shimmer pointer-events-none"></div>

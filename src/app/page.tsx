@@ -597,6 +597,86 @@ export default function Home() {
         ctx.stroke();
       }
 
+      // 6. Draw Axis Lines (Blue Center Lines)
+      ctx.strokeStyle = 'rgba(96, 165, 250, 0.8)'; // blue-400/80
+      ctx.lineWidth = 2;
+      ctx.shadowColor = 'rgba(96, 165, 250, 0.5)';
+      ctx.shadowBlur = 10;
+
+      // Vertical Axis (Y-Axis Line)
+      ctx.beginPath();
+      ctx.moveTo(GRID_SIZE / 2, 0);
+      ctx.lineTo(GRID_SIZE / 2, GRID_SIZE);
+      ctx.stroke();
+
+      // Horizontal Axis (X-Axis Line)
+      ctx.beginPath();
+      ctx.moveTo(0, GRID_SIZE / 2);
+      ctx.lineTo(GRID_SIZE, GRID_SIZE / 2);
+      ctx.stroke();
+
+      ctx.shadowColor = 'transparent';
+
+      // 6.5 Draw Ticks and Grid Numbers (10-unit intervals)
+      ctx.fillStyle = 'rgba(147, 197, 253, 0.8)'; // blue-300/80 text
+      ctx.strokeStyle = 'rgba(96, 165, 250, 0.6)'; // blue-400/60 line
+      ctx.lineWidth = 1;
+      ctx.font = 'bold 10px monospace';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+
+      for (let i = 0; i <= 20; i++) {
+        const value = -100 + (i * 10);
+        if (value === 0) continue; // Skip center 0
+
+        // Calculate Position on Grid (0 to 1000)
+        // i goes 0..20. i=10 is center.
+        // pos = (i / 20) * GRID_SIZE
+        const pos = (i / 20) * GRID_SIZE;
+        const center = GRID_SIZE / 2;
+
+        // --- X-Axis Ticks (Vertical marks on horizontal line) ---
+        // x = pos, y = center
+        ctx.beginPath();
+        ctx.moveTo(pos, center - 6);
+        ctx.lineTo(pos, center + 6);
+        ctx.stroke();
+
+        // X-Axis Number (Below)
+        ctx.fillText(Math.abs(value).toString(), pos, center + 16);
+
+        // --- Y-Axis Ticks (Horizontal marks on vertical line) ---
+        // x = center, y = pos (Note: top is -100? No, usually top is Y-. Check CSS logic)
+        // In CSS: topPercent = 50 - (value / 2). 
+        // If val=100, top=0. So top is POSITIVE Y? No, top of screen is Y=0.
+        // Wait, "Theme" usually implies Top is Good/High? Or Top is Y+?
+        // Let's look at `AnimeGrid.tsx`:
+        // value = -100..+100.
+        // topPercent = 50 - (value / 2). if val=100 -> 0%. Top.
+        // topPercent = 50 - (-100 / 2) -> 100%. Bottom.
+        // So +100 is at Top (y=0). -100 is at Bottom (y=1000).
+        // My loop `pos` goes 0..1000. 
+        // i=0 -> val=-100. pos=0. This means -100 is at TOP? 
+        // NO. `(i/20)*GRID_SIZE` means i=0 is 0px (Top).
+        // But logic says -100 is Bottom.
+        // So for Y axis, we need to invert or map correctly.
+
+        // Let's use the explicit math from CSS:
+        // topPercent = 50 - (value / 2).
+        // yPos = (topPercent / 100) * GRID_SIZE
+        const yPosIdx = (50 - (value / 2)) / 100 * GRID_SIZE;
+
+        ctx.beginPath();
+        ctx.moveTo(center - 6, yPosIdx);
+        ctx.lineTo(center + 6, yPosIdx);
+        ctx.stroke();
+
+        // Y-Axis Number (Right)
+        ctx.textAlign = 'left';
+        ctx.fillText(Math.abs(value).toString(), center + 12, yPosIdx);
+        ctx.textAlign = 'center'; // Reset
+      }
+
       // 5. Draw Anime Items
       const imageLoadPromises = gridItems.map(async (item) => {
         const layoutItem = layout.find(l => l.i === item.layoutId);
@@ -680,86 +760,6 @@ export default function Home() {
 
       ctx.restore();
       // --- END CLIPPED REGION ---
-
-      // 6. Draw Axis Lines (Blue Center Lines)
-      ctx.strokeStyle = 'rgba(96, 165, 250, 0.8)'; // blue-400/80
-      ctx.lineWidth = 2;
-      ctx.shadowColor = 'rgba(96, 165, 250, 0.5)';
-      ctx.shadowBlur = 10;
-
-      // Vertical Axis (Y-Axis Line)
-      ctx.beginPath();
-      ctx.moveTo(GRID_SIZE / 2, 0);
-      ctx.lineTo(GRID_SIZE / 2, GRID_SIZE);
-      ctx.stroke();
-
-      // Horizontal Axis (X-Axis Line)
-      ctx.beginPath();
-      ctx.moveTo(0, GRID_SIZE / 2);
-      ctx.lineTo(GRID_SIZE, GRID_SIZE / 2);
-      ctx.stroke();
-
-      ctx.shadowColor = 'transparent';
-
-      // 6.5 Draw Ticks and Grid Numbers (10-unit intervals)
-      ctx.fillStyle = 'rgba(147, 197, 253, 0.8)'; // blue-300/80 text
-      ctx.strokeStyle = 'rgba(96, 165, 250, 0.6)'; // blue-400/60 line
-      ctx.lineWidth = 1;
-      ctx.font = 'bold 10px monospace';
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'middle';
-
-      for (let i = 0; i <= 20; i++) {
-        const value = -100 + (i * 10);
-        if (value === 0) continue; // Skip center 0
-
-        // Calculate Position on Grid (0 to 1000)
-        // i goes 0..20. i=10 is center.
-        // pos = (i / 20) * GRID_SIZE
-        const pos = (i / 20) * GRID_SIZE;
-        const center = GRID_SIZE / 2;
-
-        // --- X-Axis Ticks (Vertical marks on horizontal line) ---
-        // x = pos, y = center
-        ctx.beginPath();
-        ctx.moveTo(pos, center - 6);
-        ctx.lineTo(pos, center + 6);
-        ctx.stroke();
-
-        // X-Axis Number (Below)
-        ctx.fillText(Math.abs(value).toString(), pos, center + 16);
-
-        // --- Y-Axis Ticks (Horizontal marks on vertical line) ---
-        // x = center, y = pos (Note: top is -100? No, usually top is Y-. Check CSS logic)
-        // In CSS: topPercent = 50 - (value / 2). 
-        // If val=100, top=0. So top is POSITIVE Y? No, top of screen is Y=0.
-        // Wait, "Theme" usually implies Top is Good/High? Or Top is Y+?
-        // Let's look at `AnimeGrid.tsx`:
-        // value = -100..+100.
-        // topPercent = 50 - (value / 2). if val=100 -> 0%. Top.
-        // topPercent = 50 - (-100 / 2) -> 100%. Bottom.
-        // So +100 is at Top (y=0). -100 is at Bottom (y=1000).
-        // My loop `pos` goes 0..1000. 
-        // i=0 -> val=-100. pos=0. This means -100 is at TOP? 
-        // NO. `(i/20)*GRID_SIZE` means i=0 is 0px (Top).
-        // But logic says -100 is Bottom.
-        // So for Y axis, we need to invert or map correctly.
-
-        // Let's use the explicit math from CSS:
-        // topPercent = 50 - (value / 2).
-        // yPos = (topPercent / 100) * GRID_SIZE
-        const yPosIdx = (50 - (value / 2)) / 100 * GRID_SIZE;
-
-        ctx.beginPath();
-        ctx.moveTo(center - 6, yPosIdx);
-        ctx.lineTo(center + 6, yPosIdx);
-        ctx.stroke();
-
-        // Y-Axis Number (Right)
-        ctx.textAlign = 'left';
-        ctx.fillText(Math.abs(value).toString(), center + 12, yPosIdx);
-        ctx.textAlign = 'center'; // Reset
-      }
 
       // 7. Draw Axis Labels (Inside Grid)
       ctx.font = 'bold 14px sans-serif';
@@ -862,12 +862,12 @@ export default function Home() {
               <div className="w-4 h-4 rounded-sm bg-gradient-to-br from-white to-gray-500 transform rotate-45 group-hover:rotate-90 transition-transform duration-500"></div>
             </div>
           </div>
-          <div className="flex flex-col">
+          <div className="hidden md:flex flex-col shrink-0">
             <span className="text-sm font-bold text-gray-200 tracking-wide">ANIME BIAS</span>
             <span className="text-[10px] font-medium text-gray-500 tracking-[0.2em] uppercase">Coordinate Grid</span>
           </div>
           {/* Vertical Separator */}
-          <div className="h-8 w-[1px] bg-white/5 ml-2"></div>
+          <div className="hidden md:block h-8 w-[1px] bg-white/5 ml-2 shrink-0"></div>
         </div>
 
         {/* Center: Prominent Title Area */}
@@ -896,10 +896,10 @@ export default function Home() {
             </h1>
 
             {/* Decorative Energy Lines */}
-            <div className="flex items-center gap-2 mt-2 opacity-80">
-              <div className="h-[1px] w-12 bg-gradient-to-r from-transparent to-blue-400"></div>
-              <div className="h-1 w-1 bg-blue-400 rounded-full shadow-[0_0_5px_rgba(59,130,246,1)] animate-pulse"></div>
-              <div className="h-[1px] w-12 bg-gradient-to-l from-transparent to-blue-400"></div>
+            <div className="flex items-center gap-2 mt-2 opacity-80 justify-center w-full">
+              <div className="h-[2px] w-[100px] md:w-[150px] min-w-[80px] shrink-0 bg-gradient-to-r from-transparent to-blue-400"></div>
+              <div className="h-1.5 w-1.5 shrink-0 bg-blue-400 rounded-full shadow-[0_0_8px_rgba(59,130,246,1)] animate-pulse"></div>
+              <div className="h-[2px] w-[100px] md:w-[150px] min-w-[80px] shrink-0 bg-gradient-to-l from-transparent to-blue-400"></div>
             </div>
           </div>
         </div>
@@ -921,12 +921,12 @@ export default function Home() {
           {/* Export Button - High End Primary */}
           <button
             onClick={handleExport}
-            className="group relative flex items-center gap-3 pl-4 pr-5 py-2.5 bg-zinc-100 hover:bg-white text-zinc-900 rounded-xl text-sm font-bold shadow-[0_0_20px_rgba(255,255,255,0.1)] hover:shadow-[0_0_25px_rgba(255,255,255,0.3)] transition-all active:scale-95 overflow-hidden"
+            className="group relative flex items-center justify-center gap-2 md:gap-3 w-10 h-10 md:w-auto md:h-auto md:pl-4 md:pr-5 md:py-2.5 bg-zinc-100 hover:bg-white text-zinc-900 rounded-xl text-sm font-bold shadow-[0_0_20px_rgba(255,255,255,0.1)] hover:shadow-[0_0_25px_rgba(255,255,255,0.3)] transition-all active:scale-95 overflow-hidden"
           >
             <div className="flex items-center justify-center w-5 h-5 rounded-full bg-zinc-900/10 group-hover:bg-zinc-900/20 transition-colors">
               <Download size={12} className="text-zinc-900" />
             </div>
-            <span className="tracking-wide">Save Image</span>
+            <span className="hidden md:block tracking-wide shrink-0 whitespace-nowrap">Save Image</span>
 
             {/* Shimmer Effect */}
             <div className="absolute top-0 left-0 w-full h-full bg-gradient-to-r from-transparent via-white/50 to-transparent -translate-x-[150%] skew-x-[-20deg] group-hover:animate-shimmer pointer-events-none"></div>
