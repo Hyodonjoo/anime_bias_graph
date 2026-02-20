@@ -141,7 +141,7 @@ describe('AdminPage Features', () => {
         const titleInput = await screen.findByPlaceholderText('주제 제목을 입력하세요');
         fireEvent.change(titleInput, { target: { value: 'New Theme 2024' } });
 
-        const saveNewBtn = screen.getByText('새로운 주제 저장 (비공개)');
+        const saveNewBtn = screen.getByText('주제 업데이트 (미적용)');
 
         const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true);
         const alertSpy = vi.spyOn(window, 'alert').mockImplementation(() => { });
@@ -153,7 +153,7 @@ describe('AdminPage Features', () => {
                 title: 'New Theme 2024',
                 is_active: false
             }));
-            expect(alertSpy).toHaveBeenCalledWith(expect.stringContaining('새로운 주제로 저장되었습니다'));
+            expect(alertSpy).toHaveBeenCalledWith(expect.stringContaining('변경이 완료되었습니다.'));
         });
 
         confirmSpy.mockRestore();

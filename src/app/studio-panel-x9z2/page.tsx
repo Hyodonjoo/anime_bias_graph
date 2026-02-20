@@ -314,7 +314,7 @@ export default function AdminPage() {
             alert("주제 제목은 필수입니다.");
             return;
         }
-        if (!confirm("현재 변경사항을 DB에 저장하시겠습니까? (현재 서비스되는 페이지에는 이 내용이 바로 적용되지 않습니다)")) return;
+        if (!confirm("현재 변경사항을 저장하시겠습니까? (서비스되는 페이지에는 적용되지 않습니다)")) return;
 
         try {
             let targetId = selectedHistoryId;
