@@ -27,6 +27,7 @@ export default function Home() {
   // Fixed layout state instead of responsive breakpoints
   const [layout, setLayout] = useState<Layout[]>([]);
   const [mounted, setMounted] = useState(false);
+  const [isDataLoaded, setIsDataLoaded] = useState(false);
   const [isItemDragging, setIsItemDragging] = useState(false);
   const [themeId, setThemeId] = useState<string | null>(null);
 
@@ -258,7 +259,8 @@ export default function Home() {
 
   // Auto-save to LocalStorage whenever state changes
   useEffect(() => {
-    if (!mounted || !themeId) return;
+    // Only save if mounted, themeId exists, AND data has finished initial loading
+    if (!mounted || !themeId || !isDataLoaded) return;
 
     const saveData = {
       gridItems,
@@ -267,7 +269,7 @@ export default function Home() {
     };
 
     localStorage.setItem(`animebias_save_${themeId}`, JSON.stringify(saveData));
-  }, [gridItems, layout, dockItems, themeId, mounted]);
+  }, [gridItems, layout, dockItems, themeId, mounted, isDataLoaded]);
 
 
   const fetchActiveTheme = async () => {
@@ -321,6 +323,7 @@ export default function Home() {
             setGridItems(savedData.gridItems);
             setLayout(savedData.layout);
             setDockItems(savedData.dockItems);
+            setIsDataLoaded(true);
             return; // Skip DB fetch if local save exists
           }
         } catch (e) {
@@ -343,6 +346,7 @@ export default function Home() {
         }));
         setDockItems(formattedItems);
       }
+      setIsDataLoaded(true);
 
     } catch (e) {
       console.error("Error fetching theme:", e);
@@ -421,17 +425,134 @@ export default function Home() {
       ctx.fillStyle = '#0c0a09'; // stone-950
       ctx.fillRect(0, 0, WIDTH, HEIGHT);
 
-      // 2. Title
-      ctx.fillStyle = '#ffffff';
+      // 2. Premium Title Area
+      const titleStr = (themeTitle || 'ANIME GRID').toUpperCase();
+      const titleX = WIDTH / 2;
+      const titleY = HEADER_HEIGHT / 2;
+
+      // Title Background Glow
+      const glowGradient = ctx.createRadialGradient(titleX, titleY, 0, titleX, titleY, 250);
+      glowGradient.addColorStop(0, 'rgba(59, 130, 246, 0.15)'); // Subtle blue glow
+      glowGradient.addColorStop(1, 'rgba(12, 10, 9, 0)'); // fade out to stone-950
+      ctx.fillStyle = glowGradient;
+      ctx.fillRect(0, 0, WIDTH, HEADER_HEIGHT);
+
+      // 2.5 Left Identity (Logo & Site Name)
+      ctx.save();
+      const logoStartX = 40; // px from edge
+      const logoCenterY = HEADER_HEIGHT / 2;
+
+      // Logo Icon Box - Scaled down by half
+      const logoSize = 50;
+      const cornerRadius = 10;
+
+      ctx.fillStyle = '#18181b'; // zinc-900 
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.1)';
+      ctx.lineWidth = 1.5;
+
+      // Subdued outer glow for logo
+      ctx.shadowColor = 'rgba(37, 99, 235, 0.4)'; // subtle blue
+      ctx.shadowBlur = 15;
+      ctx.beginPath();
+      if (typeof ctx.roundRect === 'function') {
+        ctx.roundRect(logoStartX, logoCenterY - (logoSize / 2), logoSize, logoSize, cornerRadius);
+      } else {
+        ctx.rect(logoStartX, logoCenterY - (logoSize / 2), logoSize, logoSize);
+      }
+      ctx.fill();
+      ctx.shadowColor = 'transparent'; // reset shadow for stroke & others
+      ctx.stroke();
+
+      // Inner Diamond shape
+      ctx.save();
+      ctx.translate(logoStartX + (logoSize / 2), logoCenterY);
+      ctx.rotate(45 * Math.PI / 180);
+      const diamondRadius = 10;
+      const innerGrad = ctx.createLinearGradient(-diamondRadius, -diamondRadius, diamondRadius, diamondRadius);
+      innerGrad.addColorStop(0, '#ffffff');
+      innerGrad.addColorStop(1, '#6b7280'); // gray-500
+      ctx.fillStyle = innerGrad;
+      ctx.beginPath();
+      if (typeof ctx.roundRect === 'function') {
+        ctx.roundRect(-diamondRadius, -diamondRadius, diamondRadius * 2, diamondRadius * 2, 2);
+      } else {
+        ctx.rect(-diamondRadius, -diamondRadius, diamondRadius * 2, diamondRadius * 2);
+      }
+      ctx.fill();
+      ctx.restore();
+
+      // Site Identity Text
+      ctx.textAlign = 'left';
+      ctx.textBaseline = 'middle';
+
+      const textStartX = logoStartX + logoSize + 12;
+
+      // ANIME BIAS
+      ctx.font = 'bold 18px sans-serif';
+      ctx.fillStyle = '#e5e7eb'; // gray-200
+      ctx.fillText('ANIME BIAS', textStartX, logoCenterY - 10);
+
+      // COORDINATE GRID
+      ctx.font = '500 12px sans-serif';
+      ctx.fillStyle = '#6b7280'; // gray-500
+      if ('letterSpacing' in ctx) {
+        (ctx as any).letterSpacing = '0.2em';
+      }
+      ctx.fillText('COORDINATE GRID', textStartX, logoCenterY + 10);
+      if ('letterSpacing' in ctx) {
+        (ctx as any).letterSpacing = '0px'; // reset
+      }
+
+      // Vertical Separator
+      const textWidth = ctx.measureText('COORDINATE GRID  ').width;
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.05)';
+      ctx.fillRect(textStartX + textWidth, logoCenterY - 20, 1.5, 40); // was 32px tall
+
+      ctx.restore();
+
+      ctx.save();
+      // Restore Original Font settings: solid white, bold, sans-serif
       ctx.font = '800 48px sans-serif';
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
-      // Add subtle text shadow
+      ctx.fillStyle = '#ffffff';
+
+      // Add subtle dark text shadow from the original
       ctx.shadowColor = 'rgba(0, 0, 0, 0.8)';
       ctx.shadowBlur = 8;
       ctx.shadowOffsetY = 4;
-      ctx.fillText((themeTitle || 'ANIME GRID').toUpperCase(), WIDTH / 2, HEADER_HEIGHT / 2);
-      ctx.shadowColor = 'transparent'; // Reset shadow
+
+      // Ensure the text aligns slightly up to balance the decorative lines below
+      ctx.fillText(titleStr, titleX, titleY - 5);
+      ctx.restore();
+
+      // Decorative Energy Lines Below Title
+      const decorY = titleY + 30;
+
+      ctx.save();
+      // Center Glow Dot
+      ctx.shadowColor = 'rgba(59, 130, 246, 0.8)';
+      ctx.shadowBlur = 8;
+      ctx.fillStyle = '#60A5FA';
+      ctx.beginPath();
+      ctx.arc(titleX, decorY, 3, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.shadowColor = 'transparent';
+
+      // Left Line (Fading to left)
+      const lineLeftGrad = ctx.createLinearGradient(titleX - 10, decorY, titleX - 60, decorY);
+      lineLeftGrad.addColorStop(0, '#60A5FA');
+      lineLeftGrad.addColorStop(1, 'rgba(96, 165, 250, 0)');
+      ctx.fillStyle = lineLeftGrad;
+      ctx.fillRect(titleX - 60, decorY - 1, 50, 2);
+
+      // Right Line (Fading to right)
+      const lineRightGrad = ctx.createLinearGradient(titleX + 10, decorY, titleX + 60, decorY);
+      lineRightGrad.addColorStop(0, '#60A5FA');
+      lineRightGrad.addColorStop(1, 'rgba(96, 165, 250, 0)');
+      ctx.fillStyle = lineRightGrad;
+      ctx.fillRect(titleX + 10, decorY - 1, 50, 2);
+      ctx.restore();
 
       // 3. Grid Area Offset
       // Center the grid in the canvas

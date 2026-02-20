@@ -307,34 +307,53 @@ export default function AdminPage() {
         }
     };
 
-    // 2. "새로운 주제 저장" (Save as New)
-    // - Always Create New DB
-    // - is_active = false (Just save draft)
-    const handleSaveAsNew = async () => {
+    // 2. "주제 업데이트" (Update without applying immediately)
+    // - Updates existing theme DB record. If new, creates inactive draft.
+    const handleUpdateDraft = async () => {
         if (!themeTitle.trim()) {
             alert("주제 제목은 필수입니다.");
             return;
         }
-        if (!confirm("현재 내용을 새로운 주제로 저장하시겠습니까? (사이트엔 적용되지 않음)")) return;
+        if (!confirm("현재 변경사항을 저장하시겠습니까? (서비스되는 페이지에는 적용되지 않습니다)")) return;
 
         try {
-            // 1. Insert New (is_active: false)
-            const { data: themeData, error: themeError } = await supabase.from('themes').insert({
-                title: themeTitle,
-                axis_top: axisLabels.top,
-                axis_bottom: axisLabels.bottom,
-                axis_left: axisLabels.left,
-                axis_right: axisLabels.right,
-                is_active: false, // Just Save
-                created_at: new Date().toISOString()
-            }).select().single();
+            let targetId = selectedHistoryId;
 
-            if (themeError) throw themeError;
+            if (targetId) {
+                // Update existing
+                const { error: themeError } = await supabase.from('themes').update({
+                    title: themeTitle,
+                    axis_top: axisLabels.top,
+                    axis_bottom: axisLabels.bottom,
+                    axis_left: axisLabels.left,
+                    axis_right: axisLabels.right,
+                    // do NOT update is_active to preserve its current state (active or inactive)
+                }).eq('id', targetId);
 
-            // 2. Insert Items
-            if (dockItems.length > 0) {
+                if (themeError) throw themeError;
+
+                // Sync Items
+                await supabase.from('anime_items').delete().eq('theme_id', targetId);
+            } else {
+                // Insert New (is_active: false)
+                const { data: themeData, error: themeError } = await supabase.from('themes').insert({
+                    title: themeTitle,
+                    axis_top: axisLabels.top,
+                    axis_bottom: axisLabels.bottom,
+                    axis_left: axisLabels.left,
+                    axis_right: axisLabels.right,
+                    is_active: false, // Draft
+                    created_at: new Date().toISOString()
+                }).select().single();
+
+                if (themeError) throw themeError;
+                targetId = themeData.id;
+            }
+
+            // Insert Items
+            if (dockItems.length > 0 && targetId) {
                 const animeToInsert = dockItems.map(item => ({
-                    theme_id: themeData.id,
+                    theme_id: targetId,
                     title: item.title,
                     image_url: item.imageUrl,
                     year: item.year
@@ -344,10 +363,8 @@ export default function AdminPage() {
                 if (itemsError) throw itemsError;
             }
 
-            alert("새로운 주제로 저장되었습니다.");
-            // Optional: Switch to this new theme? Or stay?
-            // Usually "Save As" switches context.
-            setSelectedHistoryId(themeData.id);
+            alert("변경이 완료되었습니다.");
+            if (!selectedHistoryId) setSelectedHistoryId(targetId);
             fetchHistory();
 
         } catch (e: any) {
@@ -632,10 +649,10 @@ export default function AdminPage() {
                 {/* Publish Actions */}
                 <div className="pt-4 border-t border-gray-800 sticky bottom-0 bg-gray-900/50 backdrop-blur pb-6 space-y-3">
                     <button
-                        onClick={handleSaveAsNew}
+                        onClick={handleUpdateDraft}
                         className="w-full bg-gray-800 hover:bg-gray-700 py-3 rounded-lg font-bold text-white shadow-lg transition-all border border-gray-600"
                     >
-                        새로운 주제 저장 (비공개)
+                        주제 업데이트 (미적용)
                     </button>
                     <button
                         onClick={handleUpdateAndApply}
