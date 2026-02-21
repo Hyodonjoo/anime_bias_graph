@@ -6,7 +6,7 @@ import AnimeGrid from '@/components/AnimeGrid';
 import AnimeDock from '@/components/AnimeDock';
 import { AnimeItem } from '@/lib/mockData';
 import { supabase } from '@/lib/supabase';
-import { ChevronUp, ChevronDown, Download, Plus, Minus, Eye, EyeOff } from 'lucide-react';
+import { ChevronUp, ChevronDown, ChevronLeft, ChevronRight, Download, Plus, Minus, Eye, EyeOff } from 'lucide-react';
 import { toCanvas } from 'html-to-image';
 import { resolveLayout } from '@/lib/gridUtils';
 
@@ -887,7 +887,10 @@ export default function Home() {
           </div>
 
           {/* Left */}
-          <div className="fixed left-4 top-1/2 -translate-y-1/2 z-40 pointer-events-none">
+          <div
+            className={`fixed top-1/2 -translate-y-1/2 z-40 pointer-events-none transition-all duration-500 ease-in-out ${isDockOpen ? 'left-[144px] md:left-[288px]' : 'left-4 md:left-6'
+              }`}
+          >
             <span className="block font-bold text-gray-400 bg-gray-900/90 px-3 py-1 rounded-2xl md:rounded-full border border-gray-700 shadow-lg backdrop-blur-sm max-w-[80px] md:max-w-none text-center whitespace-normal md:whitespace-nowrap leading-tight">
               ◀ {axisLabels.left}
             </span>
@@ -904,10 +907,7 @@ export default function Home() {
 
       {/* Bottom Axis Label - Sticky to Screen */}
       {showAxisLabels && (
-        <div
-          className="fixed left-1/2 -translate-x-1/2 z-40 pointer-events-none transition-all duration-500 ease-in-out"
-          style={{ bottom: isDockOpen ? '220px' : '24px' }}
-        >
+        <div className="fixed bottom-8 left-1/2 -translate-x-1/2 z-40 pointer-events-none">
           <span className="font-bold text-gray-400 bg-gray-900/90 px-3 py-1 rounded-full border border-gray-700 shadow-lg backdrop-blur-sm whitespace-nowrap">
             ▼ {axisLabels.bottom}
           </span>
@@ -937,24 +937,23 @@ export default function Home() {
 
 
 
-      {/* Bottom Dock - Floating Drawer */}
+      {/* Left Dock - Floating Drawer */}
       <div
         id="anime-dock"
-        className={`fixed left-1/2 -translate-x-1/2 z-50 transition-all duration-500 ease-in-out
-          ${isDockOpen ? 'bottom-6' : '-bottom-[11rem]'} 
-          w-[95vw] md:w-[90vw] lg:w-[1400px] h-48`}
+        className={`fixed top-1/2 -translate-y-1/2 z-50 transition-all duration-500 ease-in-out
+          ${isDockOpen ? 'left-4 md:left-6' : '-left-[7.5rem] md:-left-[15rem]'} 
+          h-[90vh] md:h-[80vh] w-32 md:w-64`}
       >
-        {/* Toggle Handle */}
-        {/* Toggle Handle - Moved to Right (Offset) and Larger */}
+        {/* Toggle Handle - Moved to Bottom Right edge */}
         <button
           onClick={() => setIsDockOpen(!isDockOpen)}
-          className="absolute -top-10 right-8 h-10 px-6 bg-gray-800/90 hover:bg-gray-700 backdrop-blur-md border border-gray-600/50 rounded-lg flex items-center justify-center gap-2 text-gray-400 hover:text-white transition-all shadow-[0_-5px_15px_rgba(0,0,0,0.3)] group z-50"
+          className="absolute bottom-8 -right-10 w-10 py-6 bg-gray-800/90 hover:bg-gray-700 backdrop-blur-md border border-gray-600/50 rounded-r-lg flex items-center justify-center gap-2 text-gray-400 hover:text-white transition-all shadow-[5px_0_15px_rgba(0,0,0,0.3)] group z-50 pointer-events-auto"
         >
-          {isDockOpen ? <ChevronDown size={24} /> : <ChevronUp size={24} />}
+          {isDockOpen ? <ChevronLeft size={24} /> : <ChevronRight size={24} />}
         </button>
 
         {/* Dock Content */}
-        <div className="w-full h-full bg-gray-900/90 backdrop-blur-2xl border border-gray-700/50 shadow-2xl rounded-2xl overflow-hidden ring-1 ring-white/10">
+        <div className="w-full h-full bg-gray-900/90 backdrop-blur-2xl border border-gray-700/50 shadow-2xl rounded-2xl md:rounded-r-2xl overflow-hidden ring-1 ring-white/10">
           <AnimeDock items={dockItems} onDragStartMobile={handleDockItemTouchStart} />
         </div>
       </div>

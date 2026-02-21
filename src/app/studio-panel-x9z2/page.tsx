@@ -5,7 +5,7 @@ import { supabase } from '@/lib/supabase';
 import AnimeGrid from '@/components/AnimeGrid';
 import AnimeDock from '@/components/AnimeDock';
 import { AnimeItem, MOCK_AXIS, MOCK_THEME, MOCK_ANIME_LIST } from '@/lib/mockData';
-import { ChevronUp, ChevronDown, Download, Eye, EyeOff } from 'lucide-react';
+import { ChevronUp, ChevronDown, ChevronLeft, ChevronRight, Download, Eye, EyeOff } from 'lucide-react';
 
 
 export default function AdminPage() {
@@ -771,7 +771,10 @@ export default function AdminPage() {
                         {axisLabels.top} ▲
                     </span>
                 </div>
-                <div className="absolute left-4 top-1/2 -translate-y-1/2 z-10 pointer-events-none">
+                <div
+                    className={`absolute top-1/2 -translate-y-1/2 z-10 pointer-events-none transition-all duration-500 ease-in-out ${previewDockOpen ? 'left-[144px] md:left-[288px]' : 'left-4 md:left-6'
+                        }`}
+                >
                     <span className="block font-bold text-gray-400 bg-gray-900/90 px-3 py-1 rounded-full border border-gray-700 shadow-lg backdrop-blur-sm text-center whitespace-nowrap text-xs">
                         ◀ {axisLabels.left}
                     </span>
@@ -782,30 +785,27 @@ export default function AdminPage() {
                     </span>
                 </div>
 
-                {/* Bottom Label - Dynamic Position */}
-                <div
-                    className="absolute left-1/2 -translate-x-1/2 z-10 pointer-events-none transition-all duration-500 ease-in-out"
-                    style={{ bottom: previewDockOpen ? '14rem' : '2rem' }}
-                >
+                {/* Bottom Label - Static Fixed Position */}
+                <div className="absolute bottom-8 left-1/2 -translate-x-1/2 z-10 pointer-events-none">
                     <span className="font-bold text-gray-400 bg-gray-900/90 px-3 py-1 rounded-full border border-gray-700 shadow-lg backdrop-blur-sm whitespace-nowrap text-xs">
                         ▼ {axisLabels.bottom}
                     </span>
                 </div>
 
-                {/* Floating Dock Preview - Interactive */}
+                {/* Floating Dock Preview - Interactive Left Drawer */}
                 <div
                     id="anime-dock-preview"
-                    className={`absolute left-1/2 -translate-x-1/2 w-[90%] h-48 z-30 transition-all duration-500 ease-in-out ${previewDockOpen ? 'bottom-6' : '-bottom-[11rem]'}`}
+                    className={`absolute top-1/2 -translate-y-1/2 z-30 transition-all duration-500 ease-in-out ${previewDockOpen ? 'left-4 md:left-6' : '-left-[7.5rem] md:-left-[15rem]'} h-[90vh] md:h-[80vh] w-32 md:w-64`}
                 >
                     {/* Toggle Handle */}
                     <button
                         onClick={() => setPreviewDockOpen(!previewDockOpen)}
-                        className="absolute -top-10 right-8 h-10 px-6 bg-gray-800/90 hover:bg-gray-700 backdrop-blur-md border border-gray-600/50 rounded-lg flex items-center justify-center gap-2 text-gray-400 hover:text-white transition-all shadow-[0_-5px_15px_rgba(0,0,0,0.3)] z-50 cursor-pointer"
+                        className="absolute bottom-8 -right-10 w-10 py-6 bg-gray-800/90 hover:bg-gray-700 backdrop-blur-md border border-gray-600/50 rounded-r-lg flex items-center justify-center gap-2 text-gray-400 hover:text-white transition-all shadow-[5px_0_15px_rgba(0,0,0,0.3)] z-50 cursor-pointer pointer-events-auto"
                     >
-                        {previewDockOpen ? <ChevronDown size={20} /> : <ChevronUp size={20} />}
+                        {previewDockOpen ? <ChevronLeft size={20} /> : <ChevronRight size={20} />}
                     </button>
 
-                    <div className="w-full h-full bg-gray-900/90 backdrop-blur-2xl border border-gray-700/50 shadow-2xl rounded-2xl overflow-hidden ring-1 ring-white/10 pointer-events-auto">
+                    <div className="w-full h-full bg-gray-900/90 backdrop-blur-2xl border border-gray-700/50 shadow-2xl rounded-2xl md:rounded-r-2xl overflow-hidden ring-1 ring-white/10 pointer-events-auto">
                         <AnimeDock items={dockItems} />
                     </div>
                 </div>
