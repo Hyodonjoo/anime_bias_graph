@@ -48,9 +48,8 @@ export default function AdminPage() {
         try {
             const itemData = JSON.parse(itemDataString);
 
-            // Avoid duplicates if needed, but logic says move from dock to grid
-            // For Admin Preview: DO NOT remove from dockItems. Just copy to grid.
-            // setDockItems(prev => prev.filter(i => i.id !== itemData.id)); // <-- Commented out to prevent removal
+            // Remove the item from dockItems when it's placed on the grid (mirroring user homepage behavior)
+            setDockItems(prev => prev.filter(i => i.id !== itemData.id));
 
             const newLayoutId = `${itemData.id}-${Date.now()}`;
             const newGridItem = { ...itemData, layoutId: newLayoutId };
@@ -82,7 +81,8 @@ export default function AdminPage() {
         const { layoutId: _, ...cleanedItem } = itemToRemove;
 
         setGridItems(prev => prev.filter(i => i.layoutId !== layoutId));
-        // setDockItems(prev => [...prev, cleanedItem]); // Do NOT add back to dock, it's already there (copy mode)
+        // Add the item back to the dock items array
+        setDockItems(prev => [...prev, cleanedItem as AnimeItem]);
         setLayout(prev => prev.filter(l => l.i !== layoutId));
     };
 
@@ -94,6 +94,10 @@ export default function AdminPage() {
 
     const loadThemeHistory = async (themeId: string) => {
         if (!themeId) return;
+
+        // Reset the grid and layout state when switching themes so preview is clean
+        setGridItems([]);
+        setLayout([]);
 
         // 1. Fetch Theme
         const { data: theme } = await supabase.from('themes').select('*').eq('id', themeId).single();
