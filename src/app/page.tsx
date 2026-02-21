@@ -418,8 +418,18 @@ export default function Home() {
       const WIDTH = GRID_SIZE + (SIDE_PADDING * 2);
       const HEIGHT = GRID_SIZE + HEADER_HEIGHT + BOTTOM_PADDING;
 
-      canvas.width = WIDTH;
-      canvas.height = HEIGHT;
+      // Render at a high resolution scale (4x) to maintain ultra crisp image quality (near 4K)
+      const SCALE = 4;
+
+      canvas.width = WIDTH * SCALE;
+      canvas.height = HEIGHT * SCALE;
+
+      // Native scaled rendering provides ultra-crisp vector shapes, text, and sharp image drawing
+      ctx.scale(SCALE, SCALE);
+
+      // Critical for preventing blur/pixelation (aliasing) when drawing anime cover images
+      ctx.imageSmoothingEnabled = true;
+      ctx.imageSmoothingQuality = 'high';
 
       // 1. Background
       ctx.fillStyle = '#0c0a09'; // stone-950
@@ -577,30 +587,10 @@ export default function Home() {
       ctx.rect(-20, -20, GRID_SIZE + 40, GRID_SIZE + 40); // Expand clip logic
       ctx.clip();
 
-      // 4. Draw Grid Lines (Background visual)
-      ctx.strokeStyle = 'rgba(75, 85, 99, 0.3)'; // gray-600/30
-      ctx.lineWidth = 1;
-
-      const CELL_SIZE = 20;
-
-      for (let i = 0; i <= GRID_SIZE; i += CELL_SIZE) {
-        // Vertical
-        ctx.beginPath();
-        ctx.moveTo(i, 0);
-        ctx.lineTo(i, GRID_SIZE);
-        ctx.stroke();
-
-        // Horizontal
-        ctx.beginPath();
-        ctx.moveTo(0, i);
-        ctx.lineTo(GRID_SIZE, i);
-        ctx.stroke();
-      }
-
-      // 6. Draw Axis Lines (Blue Center Lines)
-      ctx.strokeStyle = 'rgba(96, 165, 250, 0.8)'; // blue-400/80
+      // 6. Draw Axis Lines (White Center Lines)
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.8)'; // white/80
       ctx.lineWidth = 2;
-      ctx.shadowColor = 'rgba(96, 165, 250, 0.5)';
+      ctx.shadowColor = 'rgba(255, 255, 255, 0.5)';
       ctx.shadowBlur = 10;
 
       // Vertical Axis (Y-Axis Line)
@@ -617,65 +607,14 @@ export default function Home() {
 
       ctx.shadowColor = 'transparent';
 
-      // 6.5 Draw Ticks and Grid Numbers (10-unit intervals)
-      ctx.fillStyle = 'rgba(147, 197, 253, 0.8)'; // blue-300/80 text
-      ctx.strokeStyle = 'rgba(96, 165, 250, 0.6)'; // blue-400/60 line
-      ctx.lineWidth = 1;
-      ctx.font = 'bold 10px monospace';
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'middle';
-
-      for (let i = 0; i <= 20; i++) {
-        const value = -100 + (i * 10);
-        if (value === 0) continue; // Skip center 0
-
-        // Calculate Position on Grid (0 to 1000)
-        // i goes 0..20. i=10 is center.
-        // pos = (i / 20) * GRID_SIZE
-        const pos = (i / 20) * GRID_SIZE;
-        const center = GRID_SIZE / 2;
-
-        // --- X-Axis Ticks (Vertical marks on horizontal line) ---
-        // x = pos, y = center
-        ctx.beginPath();
-        ctx.moveTo(pos, center - 6);
-        ctx.lineTo(pos, center + 6);
-        ctx.stroke();
-
-        // X-Axis Number (Below)
-        ctx.fillText(Math.abs(value).toString(), pos, center + 16);
-
-        // --- Y-Axis Ticks (Horizontal marks on vertical line) ---
-        // x = center, y = pos (Note: top is -100? No, usually top is Y-. Check CSS logic)
-        // In CSS: topPercent = 50 - (value / 2). 
-        // If val=100, top=0. So top is POSITIVE Y? No, top of screen is Y=0.
-        // Wait, "Theme" usually implies Top is Good/High? Or Top is Y+?
-        // Let's look at `AnimeGrid.tsx`:
-        // value = -100..+100.
-        // topPercent = 50 - (value / 2). if val=100 -> 0%. Top.
-        // topPercent = 50 - (-100 / 2) -> 100%. Bottom.
-        // So +100 is at Top (y=0). -100 is at Bottom (y=1000).
-        // My loop `pos` goes 0..1000. 
-        // i=0 -> val=-100. pos=0. This means -100 is at TOP? 
-        // NO. `(i/20)*GRID_SIZE` means i=0 is 0px (Top).
-        // But logic says -100 is Bottom.
-        // So for Y axis, we need to invert or map correctly.
-
-        // Let's use the explicit math from CSS:
-        // topPercent = 50 - (value / 2).
-        // yPos = (topPercent / 100) * GRID_SIZE
-        const yPosIdx = (50 - (value / 2)) / 100 * GRID_SIZE;
-
-        ctx.beginPath();
-        ctx.moveTo(center - 6, yPosIdx);
-        ctx.lineTo(center + 6, yPosIdx);
-        ctx.stroke();
-
-        // Y-Axis Number (Right)
-        ctx.textAlign = 'left';
-        ctx.fillText(Math.abs(value).toString(), center + 12, yPosIdx);
-        ctx.textAlign = 'center'; // Reset
-      }
+      // Center Origin Dot
+      ctx.shadowColor = 'rgba(255, 255, 255, 1)';
+      ctx.shadowBlur = 15;
+      ctx.fillStyle = '#ffffff';
+      ctx.beginPath();
+      ctx.arc(GRID_SIZE / 2, GRID_SIZE / 2, 6, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.shadowColor = 'transparent';
 
       // 5. Draw Anime Items
       const imageLoadPromises = gridItems.map(async (item) => {
@@ -802,42 +741,12 @@ export default function Home() {
       // Right (Inside, Right Center, avoiding axis line)
       drawLabel(`${axisLabels.right} ▶`, GRID_SIZE - 80, GRID_SIZE / 2 - 30);
 
-      // 8. Export with Scaling
-      // Create a temporary canvas for scaling
-      const outputCanvas = document.createElement('canvas');
-      const outputCtx = outputCanvas.getContext('2d');
-
-      if (!outputCtx) {
-        // Fallback to original size if context fails
-        const dataUrl = canvas.toDataURL('image/webp', 1.0);
-        const link = document.createElement('a');
-        link.download = `${themeTitle ? themeTitle.replace(/\s+/g, '_') : 'anime_bias_grid'}.webp`;
-        link.href = dataUrl;
-        link.click();
-        return;
-      }
-
-      // Target Width: 800px
-      // Calculate Scale Factor
-      const TARGET_WIDTH = 800;
-      const scaleFactor = TARGET_WIDTH / WIDTH;
-      const TARGET_HEIGHT = HEIGHT * scaleFactor;
-
-      outputCanvas.width = TARGET_WIDTH;
-      outputCanvas.height = TARGET_HEIGHT;
-
-      // Draw original canvas onto scaled canvas
-      // Use high quality image smoothing
-      outputCtx.imageSmoothingEnabled = true;
-      outputCtx.imageSmoothingQuality = 'high';
-      outputCtx.drawImage(canvas, 0, 0, TARGET_WIDTH, TARGET_HEIGHT);
-
-      const dataUrl = outputCanvas.toDataURL('image/webp', 0.95); // High quality WebP
+      // 8. Export High-Res Image
+      const dataUrl = canvas.toDataURL('image/webp', 1.0); // Export with lossless compression for maximum crispness
       const link = document.createElement('a');
       link.download = `${themeTitle ? themeTitle.replace(/\s+/g, '_') : 'anime_bias_grid'}.webp`;
       link.href = dataUrl;
       link.click();
-
     } catch (err) {
       console.error('Export failed:', err);
       alert('이미지 저장 중 오류가 발생했습니다.');

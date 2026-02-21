@@ -331,39 +331,17 @@ export default function AnimeGrid({ items, layout, onLayoutChange, onRemoveItem,
                     height: '1000px',
                     // Force scale 1 for export
                     transform: isExport ? 'none' : `translate(${offset.x}px, ${offset.y}px) scale(${scale})`,
-                    backgroundImage: `
-                        linear-gradient(to right, rgba(75, 85, 99, 0.3) 1px, transparent 1px),
-                        linear-gradient(to bottom, rgba(75, 85, 99, 0.3) 1px, transparent 1px)
-                    `,
+                    backgroundImage: 'none',
                     backgroundSize: '20px 20px',
                     backgroundPosition: '0 0'
                 }}
             >
                 {/* Axis Lines & Origin */}
                 <div className="absolute inset-0">
-                    <div className="absolute top-0 bottom-0 left-1/2 w-[2px] bg-blue-400/80 shadow-[0_0_10px_rgba(96,165,250,0.5)] transform -translate-x-1/2 z-10"></div>
-                    <div className="absolute left-0 right-0 top-1/2 h-[2px] bg-blue-400/80 shadow-[0_0_10px_rgba(96,165,250,0.5)] transform -translate-y-1/2 z-10"></div>
+                    <div className="absolute top-0 bottom-0 left-1/2 w-[2px] bg-white/80 shadow-[0_0_10px_rgba(255,255,255,0.5)] transform -translate-x-1/2 z-10"></div>
+                    <div className="absolute left-0 right-0 top-1/2 h-[2px] bg-white/80 shadow-[0_0_10px_rgba(255,255,255,0.5)] transform -translate-y-1/2 z-10"></div>
 
-                    {Array.from({ length: 21 }).map((_, i) => {
-                        const value = -100 + (i * 10);
-                        if (value === 0) return null;
-                        const leftPercent = ((value + 100) / 200) * 100;
-                        const topPercent = 50 - (value / 2);
-
-                        return (
-                            <React.Fragment key={i}>
-                                <div className="absolute top-1/2 -translate-y-1/2 w-[1px] h-3 bg-blue-400/60 z-10" style={{ left: `${leftPercent}%` }} />
-                                <div className="absolute top-1/2 mt-4 -translate-x-1/2 text-[10px] text-blue-300/80 font-mono font-bold select-none z-10" style={{ left: `${leftPercent}%` }}>
-                                    {Math.abs(value)}
-                                </div>
-                                <div className="absolute left-1/2 -translate-x-1/2 h-[1px] w-3 bg-blue-400/60 z-10" style={{ top: `${topPercent}%` }} />
-                                <div className="absolute left-1/2 ml-4 -translate-y-1/2 text-[10px] text-blue-300/80 font-mono font-bold select-none z-10" style={{ top: `${topPercent}%` }}>
-                                    {Math.abs(value)}
-                                </div>
-                            </React.Fragment>
-                        );
-                    })}
-                    <div className="absolute left-1/2 top-1/2 w-3 h-3 bg-blue-500 rounded-full transform -translate-x-1/2 -translate-y-1/2 z-20 shadow-[0_0_15px_rgba(59,130,246,1)]"></div>
+                    <div className="absolute left-1/2 top-1/2 w-3 h-3 bg-white rounded-full transform -translate-x-1/2 -translate-y-1/2 z-20 shadow-[0_0_15px_rgba(255,255,255,1)]"></div>
                 </div>
             </div>
 
