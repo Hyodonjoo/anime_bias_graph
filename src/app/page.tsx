@@ -7,7 +7,6 @@ import AnimeDock from '@/components/AnimeDock';
 import { AnimeItem } from '@/lib/mockData';
 import { supabase } from '@/lib/supabase';
 import { ChevronUp, ChevronDown, ChevronLeft, ChevronRight, Download, Plus, Minus, Eye, EyeOff } from 'lucide-react';
-import { toCanvas } from 'html-to-image';
 import { resolveLayout } from '@/lib/gridUtils';
 
 export default function Home() {
@@ -24,7 +23,6 @@ export default function Home() {
   const handleZoomIn = () => setZoomLevel(prev => Math.min(prev + 0.1, 1.5));
   const handleZoomOut = () => setZoomLevel(prev => Math.max(prev - 0.1, 0.7));
 
-  // Fixed layout state instead of responsive breakpoints
   const [layout, setLayout] = useState<Layout[]>([]);
   const [mounted, setMounted] = useState(false);
   const [isDataLoaded, setIsDataLoaded] = useState(false);
@@ -42,6 +40,7 @@ export default function Home() {
   // Mobile Dock Dragging State
   const [draggingDockItem, setDraggingDockItem] = useState<AnimeItem | null>(null);
   const [dragOverlayPos, setDragOverlayPos] = useState({ x: 0, y: 0 });
+  const [mobileDragClientXY, setMobileDragClientXY] = useState<{ x: number; y: number } | null>(null);
   const dragItemRef = useRef<AnimeItem | null>(null); // Ref for event handlers to access current item without closure issues
 
   const GRID_SIZE = 1000;
@@ -60,21 +59,14 @@ export default function Home() {
     let maxPanX = 0;
     let maxPanY = 0;
 
-    // Use a small threshold for "1.0" to handle potential float precision issues (1.0 vs 1.0000001)
     if (scale < 1.01) {
-      // Strict Mode: When zoomed out or at 100%
-      // X-Axis strict
+      // 100% Zoom or less: Clamp to edges with slight bottom padding
       maxPanX = scaledGridW > containerW ? (scaledGridW - containerW) / 2 : 10;
-
-      // Y-Axis: Allow buffer (Dock height ~200px + extra) so user can see bottom '100' label.
-      // E.g. (Overflow/2) + 10.
       maxPanY = Math.max(0, (scaledGridH - containerH) / 2 + 20);
     } else {
-      // Zoomed Mode: Allow panning to ensure edges are accessible
-      // Increase BUFFER to 500 to allow pulling edges well into the screen even at 150%
+      // Zoomed in: Allow loose padding to pull edges into screen
       const overflowX = Math.max(0, (scaledGridW - containerW) / 2);
       const overflowY = Math.max(0, (scaledGridH - containerH) / 2);
-
       const BUFFER = 500;
       maxPanX = overflowX + BUFFER;
       maxPanY = overflowY + BUFFER;
@@ -136,10 +128,8 @@ export default function Home() {
 
   const handleTouchMove = (e: React.TouchEvent) => {
     if (!isPanningRef.current || e.touches.length !== 1) return;
-    // e.preventDefault(); // handled by style touch-action usually, or allow scroll if vertical? 
-    // Actually we want to PAN the grid, so we want to generic scroll? 
-    // The grid is overflow-hidden, so native scroll is disabled. We implement custom pan.
 
+    // Grid pan calculation for single touch
     const deltaX = e.touches[0].pageX - startMouseRef.current.x;
     const deltaY = e.touches[0].pageY - startMouseRef.current.y;
 
@@ -155,10 +145,6 @@ export default function Home() {
 
   // Mobile Dock Drag Handlers
   const handleDockItemTouchStart = (item: AnimeItem, e: React.TouchEvent) => {
-    // Prevent default to stop scrolling/refresh etc
-    // e.preventDefault(); // React event cannot be prevented async, but we can try? 
-    // Actually, better to just set state.
-
     dragItemRef.current = item;
     setDraggingDockItem(item);
     setDragOverlayPos({ x: e.touches[0].clientX, y: e.touches[0].clientY });
@@ -172,6 +158,7 @@ export default function Home() {
     e.preventDefault(); // Critical to stop scrolling while dragging
     if (e.touches.length > 0) {
       setDragOverlayPos({ x: e.touches[0].clientX, y: e.touches[0].clientY });
+      setMobileDragClientXY({ x: e.touches[0].clientX, y: e.touches[0].clientY });
     }
   };
 
@@ -182,6 +169,7 @@ export default function Home() {
 
     const item = dragItemRef.current;
     setDraggingDockItem(null);
+    setMobileDragClientXY(null);
     dragItemRef.current = null;
 
     if (!item || !gridContainerRef.current) return;
@@ -199,15 +187,13 @@ export default function Home() {
       clientY >= gridRect.top &&
       clientY <= gridRect.bottom
     ) {
-      // Calculate conversion to Grid Coordinates
-      // Formula: GridCenter + (ScreenPos - ScreenCenter - Pan) / Zoom
+      // Calculate grid-relative coordinates from screen space
       const screenCenterX = gridRect.width / 2;
       const screenCenterY = gridRect.height / 2;
 
-      const gridCenterX = GRID_SIZE / 2; // 500
-      const gridCenterY = GRID_SIZE / 2; // 500
+      const gridCenterX = GRID_SIZE / 2;
+      const gridCenterY = GRID_SIZE / 2;
 
-      // Delta from screen center
       const deltaX = clientX - gridRect.left - screenCenterX;
       const deltaY = clientY - gridRect.top - screenCenterY;
 
@@ -229,16 +215,8 @@ export default function Home() {
         isResizable: false
       };
 
-      // Update State
       setDockItems(prev => prev.filter(i => i.id !== item.id));
       setGridItems(prev => [...prev, newItem]);
-
-      // We need to resolve layout collision.
-      // We can't easily access the LATEST 'layout' state inside this closure if it changed.
-      // But layout connects to state.
-      // Instead of using 'layout' directly (which might be stale), we should probably trust it hasn't changed much?
-      // Or use a ref for layout? 
-      // For now, assume single user interaction.
 
       setLayout(prevLayout => {
         return resolveLayout([...prevLayout, gridItemParams], gridItemParams);
@@ -387,8 +365,7 @@ export default function Home() {
 
       setGridItems(prev => [...prev, { ...itemData, layoutId: newLayoutId }]);
 
-      // Update Layout with the RESOLVED positions from AnimeGrid
-      // We need to find the Item with temp ID and replace it with real ID
+      // Replace drop element template with real new layout id
       const finalLayout = resolvedLayout.map(l => {
         if (l.i === '__dropping_elem__') {
           return { ...l, i: newLayoutId, isResizable: false };
@@ -572,19 +549,9 @@ export default function Home() {
       ctx.translate(gridOriginX, gridOriginY);
 
       // --- START CLIPPED REGION (Grid Content Only) ---
-      // We clip everything to the grid area now, including labels if they were outside (but now they are inside)
-      // Actually, if we want labels INSIDE, we don't strictly need to clip them out, but standard grid clip is fine.
       ctx.save();
-
       ctx.beginPath();
-      // Allow drawing slightly outside grid (e.g. for numbers) by not strict clipping?
-      // No, user wants specifically the numbers at the edges to show. Those are drawn INSIDE the loop at pos=0 or pos=1000.
-      // Text drawing might bleed slightly. Let's expand clip slightly or just clip strictly to grid?
-      // User said "little bit of room".
-      // Let's clip to GRID_SIZE but usually text rendering *at* 0 might get cut if left-aligned.
-      // The numbers are centered. '100' at x=1000 will extend to x=1010.
-      // So we should expand the clip rect slightly.
-      ctx.rect(-20, -20, GRID_SIZE + 40, GRID_SIZE + 40); // Expand clip logic
+      ctx.rect(-20, -20, GRID_SIZE + 40, GRID_SIZE + 40); // Expand clip logic slightly for axis numbers
       ctx.clip();
 
       // 6. Draw Axis Lines (White Center Lines)
@@ -872,6 +839,7 @@ export default function Home() {
             onUpdateTag={handleUpdateTag}
             offset={pan}
             showAxisLabels={showAxisLabels}
+            externalDragClientXY={mobileDragClientXY}
           />
         </div>
       </div>

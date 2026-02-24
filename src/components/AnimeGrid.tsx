@@ -1,11 +1,11 @@
 'use client';
 
 import React, { useRef, useState, useEffect } from 'react';
-import Draggable, { DraggableEventHandler, DraggableData, DraggableEvent } from 'react-draggable';
+import Draggable, { DraggableEventHandler, DraggableEvent } from 'react-draggable';
 import { AnimeItem } from '@/lib/mockData';
 import Image from 'next/image';
 import { Layout } from '@/types/layout';
-import { resolveLayout, collides } from '@/lib/gridUtils';
+import { resolveLayout } from '@/lib/gridUtils';
 
 interface AnimeGridProps {
     items: (AnimeItem & { layoutId: string })[];
@@ -22,6 +22,7 @@ interface AnimeGridProps {
     isExport?: boolean;
     offset?: { x: number; y: number };
     showAxisLabels?: boolean;
+    externalDragClientXY?: { x: number; y: number } | null;
 }
 
 // Inner component to handle individual item drag state for performance
@@ -30,7 +31,6 @@ const DraggableGridItem = ({
     layoutItem,
     onDrag,
     onStop,
-    onRemove,
     scale,
     isDragging,
     onUpdateTag,
@@ -40,7 +40,6 @@ const DraggableGridItem = ({
     layoutItem: Layout;
     onDrag: (id: string, x: number, y: number) => void;
     onStop: (id: string, x: number, y: number, e: DraggableEvent) => void;
-    onRemove: (id: string) => void;
     scale: number;
     isDragging: boolean;
     onUpdateTag?: (id: string, tag: string) => void;
@@ -60,15 +59,14 @@ const DraggableGridItem = ({
     }, [isEditingTag]);
 
     // Sync if parent updates layout (e.g. from DB load or PUSH effect)
-    // IMPORTANT: Do NOT sync if this item is currently being dragged by the user,
-    // otherwise it fights with the mouse position.
     useEffect(() => {
         if (!isDragging) {
+            // eslint-disable-next-line react-hooks/set-state-in-effect
             setPosition({ x: layoutItem.x, y: layoutItem.y });
         }
     }, [layoutItem.x, layoutItem.y, isDragging]);
 
-    const handleDrag: DraggableEventHandler = (e, data) => {
+    const handleDrag: DraggableEventHandler = (_e, data) => {
         if (isExport) return;
         setPosition({ x: data.x, y: data.y });
         onDrag(item.layoutId, data.x, data.y);
@@ -118,7 +116,12 @@ const DraggableGridItem = ({
         >
             <div
                 ref={nodeRef}
-                className={`group absolute bg-gray-800 rounded-none border border-gray-700 overflow-visible shadow-none ${isExport ? '' : 'hover:shadow-md cursor-move'} transition-shadow anime-grid-card touch-none`}
+                className={`group absolute bg-gray-800 rounded-none border border-gray-700 overflow-visible anime-grid-card touch-none ${isDragging
+                    ? 'z-50 scale-105 opacity-80 shadow-2xl ring-2 ring-orange-500/50 cursor-grabbing'
+                    : isExport
+                        ? 'z-10 shadow-none opacity-100'
+                        : 'z-10 hover:shadow-md cursor-move opacity-100'
+                    }`}
                 style={{
                     width: '100px',
                     height: '100px',
@@ -183,32 +186,70 @@ const DraggableGridItem = ({
 // Helper: Check intersection (Moved to gridUtils)
 // Helper: Check intersection (Moved to gridUtils)
 
-export default function AnimeGrid({ items, layout, onLayoutChange, onRemoveItem, onDrop, dockId, scale = 1, onDragStateChange, onUpdateTag, isExport = false, offset = { x: 0, y: 0 } }: AnimeGridProps) {
+export default function AnimeGrid({ items, layout, onLayoutChange, onRemoveItem, onDrop, dockId, scale = 1, onDragStateChange, onUpdateTag, isExport = false, offset = { x: 0, y: 0 }, externalDragClientXY = null }: AnimeGridProps) {
     const [mounted, setMounted] = React.useState(false);
     const [draggingId, setDraggingId] = useState<string | null>(null);
+    const [previewLayout, setPreviewLayout] = useState<Layout[] | null>(null);
     const containerRef = useRef<HTMLDivElement>(null);
 
     React.useEffect(() => {
         setMounted(true);
     }, []);
 
+    // Handle Mobile external drag preview
+    useEffect(() => {
+        if (!isExport && externalDragClientXY && containerRef.current) {
+            const rect = containerRef.current.getBoundingClientRect();
+            if (
+                externalDragClientXY.x >= rect.left &&
+                externalDragClientXY.x <= rect.right &&
+                externalDragClientXY.y >= rect.top &&
+                externalDragClientXY.y <= rect.bottom
+            ) {
+                const domCenterX = rect.width / 2;
+                const domCenterY = rect.height / 2;
+                const logicalCenterX = 500;
+                const logicalCenterY = 500;
 
+                const x = logicalCenterX + (externalDragClientXY.x - rect.left - domCenterX - offset.x) / scale;
+                const y = logicalCenterY + (externalDragClientXY.y - rect.top - domCenterY - offset.y) / scale;
+
+                const layoutItem: Layout = {
+                    i: '__dropping_elem__',
+                    x: Math.max(0, x - 50),
+                    y: Math.max(0, y - 50),
+                    w: 100,
+                    h: 100
+                };
+                const prospectiveLayout = [...layout, layoutItem];
+                setPreviewLayout(resolveLayout(prospectiveLayout, layoutItem));
+            } else {
+                setPreviewLayout(null);
+            }
+        } else if (externalDragClientXY === null && draggingId === null) {
+            setPreviewLayout(null);
+        }
+    }, [externalDragClientXY, layout, scale, offset, isExport, draggingId]);
 
     const handleItemDrag = (id: string, x: number, y: number) => {
-        // ... (existing logic)
-        // Find current item
+        if (draggingId !== id) {
+            setDraggingId(id);
+            if (onDragStateChange) onDragStateChange(true);
+        }
+
         const verifyItem = layout.find(l => l.i === id);
         if (!verifyItem) return;
 
         const movingItem = { ...verifyItem, x, y };
-        // Just update the moving item, do NOT resolve collisions for others during drag
-        const newLayout = layout.map(l => l.i === id ? movingItem : l);
 
-        onLayoutChange(newLayout);
+        // Calculate and show the preview of collision resolutions without updating parent state yet
+        const resolved = resolveLayout(layout, movingItem);
+        setPreviewLayout(resolved);
     };
 
     const handleItemDragStop = (id: string, x: number, y: number, e: DraggableEvent) => {
         setDraggingId(null);
+        setPreviewLayout(null);
         if (onDragStateChange) onDragStateChange(false);
         // ... (rest of simple logic: Dock removal check, final position sync)
 
@@ -256,9 +297,36 @@ export default function AnimeGrid({ items, layout, onLayoutChange, onRemoveItem,
 
     const handleDragOver = (e: React.DragEvent) => {
         e.preventDefault(); // Allow drop
+        if (isExport) return;
+        if (!containerRef.current) return;
+
+        const rect = containerRef.current.getBoundingClientRect();
+        const domCenterX = rect.width / 2;
+        const domCenterY = rect.height / 2;
+        const logicalCenterX = 500;
+        const logicalCenterY = 500;
+
+        const x = logicalCenterX + (e.clientX - rect.left - domCenterX - offset.x) / scale;
+        const y = logicalCenterY + (e.clientY - rect.top - domCenterY - offset.y) / scale;
+
+        const layoutItem: Layout = {
+            i: '__dropping_elem__',
+            x: Math.max(0, x - 50),
+            y: Math.max(0, y - 50),
+            w: 100,
+            h: 100
+        };
+
+        const prospectiveLayout = [...layout, layoutItem];
+        setPreviewLayout(resolveLayout(prospectiveLayout, layoutItem));
+    };
+
+    const handleDragLeave = () => {
+        setPreviewLayout(null);
     };
 
     const handleDropInternal = (e: React.DragEvent) => {
+        setPreviewLayout(null);
         if (isExport) return;
         e.preventDefault();
         if (!containerRef.current) return;
@@ -314,6 +382,7 @@ export default function AnimeGrid({ items, layout, onLayoutChange, onRemoveItem,
             id={isExport ? "anime-grid-export" : "anime-grid-content"} // Different ID for export
             className={`relative flex flex-col justify-between shrink-0 ${isExport ? '' : 'group/grid overflow-hidden'}`}
             onDragOver={handleDragOver}
+            onDragLeave={handleDragLeave}
             onDrop={handleDropInternal}
             style={{
                 width: '1000px', // Fixed size
@@ -348,6 +417,31 @@ export default function AnimeGrid({ items, layout, onLayoutChange, onRemoveItem,
             {/* Interactive Grid Items Layer - Separate from visual background but scaled same way */}
             <div className="absolute inset-0 z-10 pointer-events-auto origin-center"
                 style={{ width: '1000px', height: '1000px', transform: isExport ? 'none' : `translate(${offset.x}px, ${offset.y}px) scale(${scale})` }}>
+
+                {/* Preview Layout Rendering */}
+                {previewLayout && previewLayout.map(item => {
+                    const isExternal = item.i === '__dropping_elem__';
+                    const isDraggedItem = item.i === draggingId;
+                    const original = layout.find(l => l.i === item.i);
+
+                    // Show preview box if it's the dropping/dragged item OR if an item is pushed down/changed
+                    if (isExternal || isDraggedItem || (original && (original.x !== item.x || original.y !== item.y))) {
+                        const isMainActiveItem = isExternal || isDraggedItem;
+                        return (
+                            <div key={`preview-${item.i}`}
+                                className={`absolute border-2 border-dashed rounded-none pointer-events-none z-0 ${isMainActiveItem
+                                    ? 'border-orange-500 bg-orange-500/20'
+                                    : 'border-blue-500/50 bg-blue-500/10'
+                                    }`}
+                                style={{
+                                    width: item.w, height: item.h, left: item.x, top: item.y
+                                }}
+                            />
+                        );
+                    }
+                    return null;
+                })}
+
                 {items.map((item) => {
                     const layoutItem = layout.find(l => l.i === item.layoutId);
                     if (!layoutItem) return null;
@@ -358,7 +452,6 @@ export default function AnimeGrid({ items, layout, onLayoutChange, onRemoveItem,
                             layoutItem={layoutItem}
                             onDrag={handleItemDrag}
                             onStop={handleItemDragStop}
-                            onRemove={onRemoveItem}
                             scale={isExport ? 1 : scale}
                             isDragging={draggingId === item.layoutId}
                             onUpdateTag={onUpdateTag}
