@@ -124,7 +124,7 @@ const DraggableGridItem = ({
                     }`}
                 style={{
                     width: '100px',
-                    height: '100px',
+                    height: '150px',
                     left: 0,
                     position: 'absolute'
                 }}
@@ -217,9 +217,9 @@ export default function AnimeGrid({ items, layout, onLayoutChange, onRemoveItem,
                 const layoutItem: Layout = {
                     i: '__dropping_elem__',
                     x: Math.max(0, x - 50),
-                    y: Math.max(0, y - 50),
+                    y: Math.max(0, y - 75),
                     w: 100,
-                    h: 100
+                    h: 150
                 };
                 const prospectiveLayout = [...layout, layoutItem];
                 setPreviewLayout(resolveLayout(prospectiveLayout, layoutItem));
@@ -312,9 +312,9 @@ export default function AnimeGrid({ items, layout, onLayoutChange, onRemoveItem,
         const layoutItem: Layout = {
             i: '__dropping_elem__',
             x: Math.max(0, x - 50),
-            y: Math.max(0, y - 50),
+            y: Math.max(0, y - 75),
             w: 100,
-            h: 100
+            h: 150
         };
 
         const prospectiveLayout = [...layout, layoutItem];
@@ -350,9 +350,9 @@ export default function AnimeGrid({ items, layout, onLayoutChange, onRemoveItem,
         const layoutItem: Layout = {
             i: '__dropping_elem__', // handled by parent
             x: Math.max(0, x - 50), // Center (100/2)
-            y: Math.max(0, y - 50),
+            y: Math.max(0, y - 75),
             w: 100,
-            h: 100
+            h: 150
         };
 
         if (onDrop) {

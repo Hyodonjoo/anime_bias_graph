@@ -16,7 +16,7 @@ export default function AnimeDock({ items, onDragStartMobile }: AnimeDockProps) 
             <div className="px-4 py-2 border-b border-gray-800 bg-gray-950">
                 <h3 className="text-sm font-semibold text-gray-400">애니메이션 목록</h3>
             </div>
-            <div className="flex-1 overflow-y-auto overflow-x-hidden p-4 flex flex-col gap-4 scrollbar-thin scrollbar-thumb-gray-700 scrollbar-track-transparent">
+            <div className="flex-1 overflow-y-auto overflow-x-hidden p-4 grid grid-cols-1 md:grid-cols-2 gap-4 auto-rows-max scrollbar-thin scrollbar-thumb-gray-700 scrollbar-track-transparent">
                 {items.map((item) => (
                     <div
                         key={item.id}
@@ -34,7 +34,7 @@ export default function AnimeDock({ items, onDragStartMobile }: AnimeDockProps) 
                                 onDragStartMobile(item, e);
                             }
                         }}
-                        className="flex-shrink-0 w-full h-24 md:h-32 bg-gray-800 rounded-lg border border-gray-700 overflow-hidden relative group hover:scale-105 transition-transform cursor-grab active:cursor-grabbing touch-none"
+                        className="flex-shrink-0 w-full aspect-[2/3] bg-gray-800 rounded-lg border border-gray-700 overflow-hidden relative group hover:scale-105 transition-transform cursor-grab active:cursor-grabbing touch-none"
                     >
                         <div className="relative w-full h-[80%]">
                             <Image
