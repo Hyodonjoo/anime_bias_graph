@@ -11,6 +11,7 @@ import { resolveLayout } from '@/lib/gridUtils';
 
 export default function Home() {
   const [themeTitle, setThemeTitle] = useState('');
+  const [themePeriod, setThemePeriod] = useState('');
   const [axisLabels, setAxisLabels] = useState({ top: '', bottom: '', left: '', right: '' });
   const [showAxisLabels, setShowAxisLabels] = useState(true);
   const [dockItems, setDockItems] = useState<AnimeItem[]>([]);
@@ -209,9 +210,9 @@ export default function Home() {
       const gridItemParams: Layout = {
         i: newLayoutId,
         x: Math.max(0, x - 50), // Center
-        y: Math.max(0, y - 50),
+        y: Math.max(0, y - 75),
         w: 100,
-        h: 100,
+        h: 150,
         isResizable: false
       };
 
@@ -265,6 +266,7 @@ export default function Home() {
 
       setThemeId(themes.id);
       setThemeTitle(themes.title);
+      setThemePeriod(themes.period || '');
       setAxisLabels({
         top: themes.axis_top,
         bottom: themes.axis_bottom,
@@ -299,7 +301,9 @@ export default function Home() {
           if (savedData.gridItems && savedData.layout && savedData.dockItems) {
             console.log("Loaded state from LocalStorage");
             setGridItems(savedData.gridItems);
-            setLayout(savedData.layout);
+            // Forcefully update any previously saved older 100x100 items to now have h: 150
+            const updatedLayout = savedData.layout.map((l: Layout) => ({ ...l, h: 150 }));
+            setLayout(updatedLayout);
             setDockItems(savedData.dockItems);
             setIsDataLoaded(true);
             return; // Skip DB fetch if local save exists
@@ -513,6 +517,36 @@ export default function Home() {
       ctx.fillText(titleStr, titleX, titleY - 5);
       ctx.restore();
 
+      // Top Right: themePeriod (If exists)
+      if (themePeriod) {
+        ctx.save();
+        ctx.textAlign = 'right';
+        ctx.textBaseline = 'middle';
+        ctx.font = 'bold 16px sans-serif';
+        const pTextWidth = ctx.measureText(themePeriod).width;
+        const pPaddingX = 20;
+        const pPaddingY = 14;
+        const px = WIDTH - 40; // distance from right
+        const py = titleY - 5;
+
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.05)';
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.1)';
+        ctx.lineWidth = 1.5;
+
+        ctx.beginPath();
+        if (typeof ctx.roundRect === 'function') {
+          ctx.roundRect(px - pTextWidth - pPaddingX, py - pPaddingY, pTextWidth + (pPaddingX * 2), pPaddingY * 2, 10);
+        } else {
+          ctx.rect(px - pTextWidth - pPaddingX, py - pPaddingY, pTextWidth + (pPaddingX * 2), pPaddingY * 2);
+        }
+        ctx.fill();
+        ctx.stroke();
+
+        ctx.fillStyle = '#d1d5db'; // gray-300
+        ctx.fillText(themePeriod, px - pPaddingX, py);
+        ctx.restore();
+      }
+
       // Decorative Energy Lines Below Title
       const decorY = titleY + 30;
 
@@ -608,13 +642,14 @@ export default function Home() {
       loadedImages.forEach(data => {
         if (!data) return;
         const { img, x, y, tag } = data;
-        const ITEM_SIZE = 100; // 100px fixed (5x5 grids)
+        const ITEM_WIDTH = 100;
+        const ITEM_HEIGHT = 150;
 
         // Draw Image with object-fit: cover behavior
         try {
           // Calculate aspect ratio
           const imgRatio = img.width / img.height;
-          const targetRatio = 1; // Square 100x100
+          const targetRatio = ITEM_WIDTH / ITEM_HEIGHT; // 2:3 ratio
 
           let sx = 0, sy = 0, sWidth = img.width, sHeight = img.height;
 
@@ -632,16 +667,16 @@ export default function Home() {
             sy = (img.height - sHeight) / 2;
           }
 
-          ctx.drawImage(img, sx, sy, sWidth, sHeight, x, y, ITEM_SIZE, ITEM_SIZE);
+          ctx.drawImage(img, sx, sy, sWidth, sHeight, x, y, ITEM_WIDTH, ITEM_HEIGHT);
         } catch (e) {
           ctx.fillStyle = '#333';
-          ctx.fillRect(x, y, ITEM_SIZE, ITEM_SIZE);
+          ctx.fillRect(x, y, ITEM_WIDTH, ITEM_HEIGHT);
         }
 
         // Border
         ctx.strokeStyle = '#374151'; // gray-700
         ctx.lineWidth = 1;
-        ctx.strokeRect(x, y, ITEM_SIZE, ITEM_SIZE);
+        ctx.strokeRect(x, y, ITEM_WIDTH, ITEM_HEIGHT);
 
         // Draw Tag if exists
         if (tag) {
@@ -651,8 +686,8 @@ export default function Home() {
 
           const textWidth = ctx.measureText(tag).width;
           const padding = 4;
-          const tagX = x + ITEM_SIZE / 2;
-          const tagY = y + ITEM_SIZE - 5; // Slightly overlapping bottom
+          const tagX = x + ITEM_WIDTH / 2;
+          const tagY = y + ITEM_HEIGHT - 5; // Slightly overlapping bottom
 
           // Tag Background
           ctx.fillStyle = 'rgba(0, 0, 0, 0.8)';
@@ -782,6 +817,15 @@ export default function Home() {
 
         {/* Right: Modern Controls */}
         <div className="flex items-center gap-3 relative z-10">
+          {/* Period Display */}
+          {themePeriod && (
+            <div className="hidden md:flex items-center justify-center px-4 py-2 mr-2 bg-white/5 border border-white/10 rounded-xl backdrop-blur-sm shadow-[0_0_15px_rgba(255,255,255,0.05)]">
+              <span className="text-sm font-bold text-gray-300 tracking-wider">
+                {themePeriod}
+              </span>
+            </div>
+          )}
+
           {/* Axis Toggle - Minimal Glass */}
           <button
             onClick={() => setShowAxisLabels(!showAxisLabels)}
@@ -929,7 +973,7 @@ export default function Home() {
       {/* Mobile Drag Overlay */}
       {draggingDockItem && (
         <div
-          className="fixed pointer-events-none z-[100] w-20 h-20 rounded-lg overflow-hidden border-2 border-blue-500 shadow-xl opacity-80"
+          className="fixed pointer-events-none z-[100] w-[100px] h-[150px] rounded-lg overflow-hidden border-2 border-blue-500 shadow-xl opacity-80"
           style={{
             left: dragOverlayPos.x,
             top: dragOverlayPos.y,
