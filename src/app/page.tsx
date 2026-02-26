@@ -11,6 +11,7 @@ import { resolveLayout } from '@/lib/gridUtils';
 
 export default function Home() {
   const [themeTitle, setThemeTitle] = useState('');
+  const [themePeriod, setThemePeriod] = useState('');
   const [axisLabels, setAxisLabels] = useState({ top: '', bottom: '', left: '', right: '' });
   const [showAxisLabels, setShowAxisLabels] = useState(true);
   const [dockItems, setDockItems] = useState<AnimeItem[]>([]);
@@ -265,6 +266,7 @@ export default function Home() {
 
       setThemeId(themes.id);
       setThemeTitle(themes.title);
+      setThemePeriod(themes.period || '');
       setAxisLabels({
         top: themes.axis_top,
         bottom: themes.axis_bottom,
@@ -514,6 +516,36 @@ export default function Home() {
       // Ensure the text aligns slightly up to balance the decorative lines below
       ctx.fillText(titleStr, titleX, titleY - 5);
       ctx.restore();
+
+      // Top Right: themePeriod (If exists)
+      if (themePeriod) {
+        ctx.save();
+        ctx.textAlign = 'right';
+        ctx.textBaseline = 'middle';
+        ctx.font = 'bold 16px sans-serif';
+        const pTextWidth = ctx.measureText(themePeriod).width;
+        const pPaddingX = 20;
+        const pPaddingY = 14;
+        const px = WIDTH - 40; // distance from right
+        const py = titleY - 5;
+
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.05)';
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.1)';
+        ctx.lineWidth = 1.5;
+
+        ctx.beginPath();
+        if (typeof ctx.roundRect === 'function') {
+          ctx.roundRect(px - pTextWidth - pPaddingX, py - pPaddingY, pTextWidth + (pPaddingX * 2), pPaddingY * 2, 10);
+        } else {
+          ctx.rect(px - pTextWidth - pPaddingX, py - pPaddingY, pTextWidth + (pPaddingX * 2), pPaddingY * 2);
+        }
+        ctx.fill();
+        ctx.stroke();
+
+        ctx.fillStyle = '#d1d5db'; // gray-300
+        ctx.fillText(themePeriod, px - pPaddingX, py);
+        ctx.restore();
+      }
 
       // Decorative Energy Lines Below Title
       const decorY = titleY + 30;
@@ -785,6 +817,15 @@ export default function Home() {
 
         {/* Right: Modern Controls */}
         <div className="flex items-center gap-3 relative z-10">
+          {/* Period Display */}
+          {themePeriod && (
+            <div className="hidden md:flex items-center justify-center px-4 py-2 mr-2 bg-white/5 border border-white/10 rounded-xl backdrop-blur-sm shadow-[0_0_15px_rgba(255,255,255,0.05)]">
+              <span className="text-sm font-bold text-gray-300 tracking-wider">
+                {themePeriod}
+              </span>
+            </div>
+          )}
+
           {/* Axis Toggle - Minimal Glass */}
           <button
             onClick={() => setShowAxisLabels(!showAxisLabels)}

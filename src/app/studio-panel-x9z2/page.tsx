@@ -17,6 +17,7 @@ export default function AdminPage() {
 
     // Editor State
     const [themeTitle, setThemeTitle] = useState('');
+    const [themePeriod, setThemePeriod] = useState('');
     const [axisLabels, setAxisLabels] = useState({ top: '', bottom: '', left: '', right: '' });
     const [dockItems, setDockItems] = useState<AnimeItem[]>([]);
     const [newAnime, setNewAnime] = useState<{ id?: string, title: string, imageUrl: string, year: number }>({ id: '', title: '', imageUrl: '', year: 2024 });
@@ -103,6 +104,7 @@ export default function AdminPage() {
         const { data: theme } = await supabase.from('themes').select('*').eq('id', themeId).single();
         if (theme) {
             setThemeTitle(theme.title);
+            setThemePeriod(theme.period || '');
             setAxisLabels({
                 top: theme.axis_top,
                 bottom: theme.axis_bottom,
@@ -195,6 +197,7 @@ export default function AdminPage() {
     // Resets the editor to "New Theme" state
     const resetEditor = () => {
         setThemeTitle('');
+        setThemePeriod('');
         setAxisLabels({ top: '', bottom: '', left: '', right: '' });
         setDockItems([]);
         setSelectedHistoryId('');
@@ -257,6 +260,7 @@ export default function AdminPage() {
                 // 2. Update current theme and set Active
                 const { error: themeError } = await supabase.from('themes').update({
                     title: themeTitle,
+                    period: themePeriod,
                     axis_top: axisLabels.top,
                     axis_bottom: axisLabels.bottom,
                     axis_left: axisLabels.left,
@@ -277,6 +281,7 @@ export default function AdminPage() {
                 // 2. Insert New
                 const { data: themeData, error: themeError } = await supabase.from('themes').insert({
                     title: themeTitle,
+                    period: themePeriod,
                     axis_top: axisLabels.top,
                     axis_bottom: axisLabels.bottom,
                     axis_left: axisLabels.left,
@@ -327,6 +332,7 @@ export default function AdminPage() {
                 // Update existing
                 const { error: themeError } = await supabase.from('themes').update({
                     title: themeTitle,
+                    period: themePeriod,
                     axis_top: axisLabels.top,
                     axis_bottom: axisLabels.bottom,
                     axis_left: axisLabels.left,
@@ -342,6 +348,7 @@ export default function AdminPage() {
                 // Insert New (is_active: false)
                 const { data: themeData, error: themeError } = await supabase.from('themes').insert({
                     title: themeTitle,
+                    period: themePeriod,
                     axis_top: axisLabels.top,
                     axis_bottom: axisLabels.bottom,
                     axis_left: axisLabels.left,
@@ -538,15 +545,26 @@ export default function AdminPage() {
                     </div>
 
                     {/* Theme Title */}
-                    <div className="space-y-2">
-                        <label className="text-sm text-gray-400">주제 (필수)</label>
-                        <input
-                            required
-                            value={themeTitle}
-                            onChange={(e) => setThemeTitle(e.target.value)}
-                            placeholder="주제 제목을 입력하세요"
-                            className="w-full bg-gray-950 border border-gray-800 rounded p-2 focus:ring-1 focus:ring-purple-500 outline-none transition-all"
-                        />
+                    <div className="space-y-4">
+                        <div className="space-y-2">
+                            <label className="text-sm text-gray-400">주제 (필수)</label>
+                            <input
+                                required
+                                value={themeTitle}
+                                onChange={(e) => setThemeTitle(e.target.value)}
+                                placeholder="주제 제목을 입력하세요"
+                                className="w-full bg-gray-950 border border-gray-800 rounded p-2 focus:ring-1 focus:ring-purple-500 outline-none transition-all"
+                            />
+                        </div>
+                        <div className="space-y-2">
+                            <label className="text-sm text-gray-400">기간 (선택)</label>
+                            <input
+                                value={themePeriod}
+                                onChange={(e) => setThemePeriod(e.target.value)}
+                                placeholder="예: 2024. 01 ~ 2024. 03"
+                                className="w-full bg-gray-950 border border-gray-800 rounded p-2 focus:ring-1 focus:ring-purple-500 outline-none transition-all"
+                            />
+                        </div>
                     </div>
                 </div>
 
@@ -730,6 +748,15 @@ export default function AdminPage() {
 
                     {/* Right: Modern Controls */}
                     <div className="flex items-center gap-3 relative z-10">
+                        {/* Period Display */}
+                        {themePeriod && (
+                            <div className="hidden md:flex items-center justify-center px-4 py-2 mr-2 bg-white/5 border border-white/10 rounded-xl backdrop-blur-sm shadow-[0_0_15px_rgba(255,255,255,0.05)]">
+                                <span className="text-sm font-bold text-gray-300 tracking-wider">
+                                    {themePeriod}
+                                </span>
+                            </div>
+                        )}
+
                         {/* Axis Toggle - Minimal Glass */}
                         <button
                             className="flex items-center justify-center w-10 h-10 rounded-xl bg-white/5 hover:bg-white/10 border border-white/5 text-gray-400 hover:text-white transition-all hover:scale-105 active:scale-95 group"
