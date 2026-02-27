@@ -87,6 +87,17 @@ export default function AdminPage() {
         setLayout(prev => prev.filter(l => l.i !== layoutId));
     };
 
+    const handleBringToFrontPreview = (layoutId: string) => {
+        setGridItems(prev => {
+            const idx = prev.findIndex(i => i.layoutId === layoutId);
+            if (idx === -1 || idx === prev.length - 1) return prev;
+            const newItems = [...prev];
+            const [item] = newItems.splice(idx, 1);
+            newItems.push(item);
+            return newItems;
+        });
+    };
+
     const fetchHistory = async () => {
         if (!isAuthenticated) return;
         const { data } = await supabase.from('themes').select('id, title, created_at').order('created_at', { ascending: false });
@@ -793,6 +804,7 @@ export default function AdminPage() {
                         scale={0.85}
                         showAxisLabels={true}
                         dockId="anime-dock-preview"
+                        onBringToFront={handleBringToFrontPreview}
                     />
                 </div>
 

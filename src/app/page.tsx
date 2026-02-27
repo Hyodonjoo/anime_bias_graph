@@ -230,6 +230,16 @@ export default function Home() {
     setPan(prev => getClampedPan(prev.x, prev.y, zoomLevel));
   }, [zoomLevel]);
 
+  const handleBringToFront = (layoutId: string) => {
+    setGridItems(prev => {
+      const idx = prev.findIndex(i => i.layoutId === layoutId);
+      if (idx === -1 || idx === prev.length - 1) return prev;
+      const newItems = [...prev];
+      const [item] = newItems.splice(idx, 1);
+      newItems.push(item);
+      return newItems;
+    });
+  };
 
   useEffect(() => {
     setMounted(true);
@@ -884,6 +894,7 @@ export default function Home() {
             offset={pan}
             showAxisLabels={showAxisLabels}
             externalDragClientXY={mobileDragClientXY}
+            onBringToFront={handleBringToFront}
           />
         </div>
       </div>

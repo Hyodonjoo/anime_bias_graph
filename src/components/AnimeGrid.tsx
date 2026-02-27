@@ -23,6 +23,7 @@ interface AnimeGridProps {
     offset?: { x: number; y: number };
     showAxisLabels?: boolean;
     externalDragClientXY?: { x: number; y: number } | null;
+    onBringToFront?: (id: string) => void;
 }
 
 // Inner component to handle individual item drag state for performance
@@ -186,7 +187,7 @@ const DraggableGridItem = ({
 // Helper: Check intersection (Moved to gridUtils)
 // Helper: Check intersection (Moved to gridUtils)
 
-export default function AnimeGrid({ items, layout, onLayoutChange, onRemoveItem, onDrop, dockId, scale = 1, onDragStateChange, onUpdateTag, isExport = false, offset = { x: 0, y: 0 }, externalDragClientXY = null }: AnimeGridProps) {
+export default function AnimeGrid({ items, layout, onLayoutChange, onRemoveItem, onDrop, dockId, scale = 1, onDragStateChange, onUpdateTag, isExport = false, offset = { x: 0, y: 0 }, externalDragClientXY = null, onBringToFront }: AnimeGridProps) {
     const [mounted, setMounted] = React.useState(false);
     const [draggingId, setDraggingId] = useState<string | null>(null);
     const [previewLayout, setPreviewLayout] = useState<Layout[] | null>(null);
@@ -293,6 +294,9 @@ export default function AnimeGrid({ items, layout, onLayoutChange, onRemoveItem,
         const movingItem = { ...verifyItem, x, y };
         const newLayout = resolveLayout(layout, movingItem);
         onLayoutChange(newLayout);
+
+        // Reorder DOM at the end of the drag to prevent dropping capture during the gesture
+        if (onBringToFront) onBringToFront(id);
     };
 
     const handleDragOver = (e: React.DragEvent) => {
