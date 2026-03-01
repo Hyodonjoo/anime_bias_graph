@@ -18,13 +18,24 @@ interface AnimeGridProps {
     isDockOpen?: boolean;
     scale?: number;
     onDragStateChange?: (isDragging: boolean) => void;
-    onUpdateTag?: (id: string, tag: string) => void;
+    onUpdateTag?: (id: string, tag: string, tagColor?: string) => void;
     isExport?: boolean;
     offset?: { x: number; y: number };
     showAxisLabels?: boolean;
     externalDragClientXY?: { x: number; y: number } | null;
     onBringToFront?: (id: string) => void;
 }
+
+const PRESET_COLORS = [
+    '#ffffff', // White
+    '#ef4444', // Red
+    '#f97316', // Orange
+    '#eab308', // Yellow
+    '#22c55e', // Green
+    '#3b82f6', // Blue
+    '#a855f7', // Purple
+    '#ec4899', // Pink
+];
 
 // Inner component to handle individual item drag state for performance
 const DraggableGridItem = ({
@@ -43,7 +54,7 @@ const DraggableGridItem = ({
     onStop: (id: string, x: number, y: number, e: DraggableEvent) => void;
     scale: number;
     isDragging: boolean;
-    onUpdateTag?: (id: string, tag: string) => void;
+    onUpdateTag?: (id: string, tag: string, tagColor?: string) => void;
     isExport?: boolean;
 }) => {
     // Local state for smooth dragging without dragging parent constantly
@@ -51,6 +62,8 @@ const DraggableGridItem = ({
     const nodeRef = useRef(null);
     const [isEditingTag, setIsEditingTag] = useState(false);
     const [tagInput, setTagInput] = useState(item.tag || '');
+    const [tagColorInput, setTagColorInput] = useState(item.tagColor || '#ffffff');
+    const [showColorMenu, setShowColorMenu] = useState(false);
     const inputRef = useRef<HTMLInputElement>(null);
 
     useEffect(() => {
@@ -85,13 +98,16 @@ const DraggableGridItem = ({
         e.preventDefault();
         if (!onUpdateTag) return;
         setTagInput(item.tag || '');
+        setTagColorInput(item.tagColor || '#ffffff');
         setIsEditingTag(true);
+        setShowColorMenu(false);
     };
 
     const handleTagSubmit = () => {
         setIsEditingTag(false);
+        setShowColorMenu(false);
         if (onUpdateTag) {
-            onUpdateTag(item.layoutId, tagInput.trim());
+            onUpdateTag(item.layoutId, tagInput.trim(), tagColorInput);
         }
     };
 
@@ -101,7 +117,9 @@ const DraggableGridItem = ({
             handleTagSubmit();
         } else if (e.key === 'Escape') {
             setIsEditingTag(false);
+            setShowColorMenu(false);
             setTagInput(item.tag || '');
+            setTagColorInput(item.tagColor || '#ffffff');
         }
     };
 
@@ -143,23 +161,74 @@ const DraggableGridItem = ({
 
                 {/* Tag Display / Editor */}
                 {isEditingTag ? (
-                    <div className="absolute -bottom-8 left-1/2 -translate-x-1/2 z-[60]">
+                    <div
+                        className="absolute -bottom-8 left-1/2 -translate-x-1/2 z-[60] flex items-center gap-1 bg-black/90 rounded border border-blue-500 shadow-lg p-0.5"
+                        onBlur={(e) => {
+                            if (!e.currentTarget.contains(e.relatedTarget)) {
+                                handleTagSubmit();
+                            }
+                        }}
+                        tabIndex={-1}
+                    >
                         <input
                             ref={inputRef}
                             type="text"
                             value={tagInput}
                             onChange={(e) => setTagInput(e.target.value)}
                             maxLength={12}
-                            onBlur={handleTagSubmit}
                             onKeyDown={handleTagKeyDown}
                             onMouseDown={(e) => e.stopPropagation()}
-                            className="bg-black/90 text-white text-[12px] px-2 py-1 rounded border border-blue-500 outline-none text-center w-24 shadow-lg"
+                            className="bg-transparent text-[12px] px-1.5 py-0.5 outline-none text-center w-24"
                             placeholder="Tag..."
+                            style={{ color: tagColorInput }}
                         />
+                        <div className="w-[1px] h-4 bg-gray-600"></div>
+
+                        {/* Expandable Color Menu Trigger */}
+                        <div className="relative flex items-center shrink-0 h-full pl-0.5 pr-0.5">
+                            <button
+                                type="button"
+                                onMouseDown={(e) => {
+                                    e.stopPropagation();
+                                    e.preventDefault();
+                                    setShowColorMenu(!showColorMenu);
+                                }}
+                                className="w-5 h-5 rounded-sm border border-gray-500 cursor-pointer hover:border-white transition-colors"
+                                style={{ backgroundColor: tagColorInput }}
+                                title="Select color"
+                            />
+
+                            {/* Popped Color Menu */}
+                            {showColorMenu && (
+                                <div
+                                    className="absolute bottom-0 left-full ml-2 flex flex-col items-center gap-1.5 p-1.5 bg-black/95 border border-blue-500/50 rounded shadow-xl"
+                                >
+                                    {PRESET_COLORS.map(col => (
+                                        <button
+                                            key={col}
+                                            type="button"
+                                            onMouseDown={(e) => {
+                                                e.stopPropagation();
+                                                e.preventDefault();
+                                                setTagColorInput(col);
+                                                setShowColorMenu(false);
+                                                if (inputRef.current) inputRef.current.focus();
+                                            }}
+                                            className={`w-5 h-5 rounded-full border transition-all hover:scale-110 ${tagColorInput === col ? 'border-white scale-110 shadow-[0_0_8px_rgba(255,255,255,0.5)]' : 'border-gray-600'}`}
+                                            style={{ backgroundColor: col }}
+                                            title={col}
+                                        />
+                                    ))}
+                                </div>
+                            )}
+                        </div>
                     </div>
                 ) : (
                     item.tag && (
-                        <div className="absolute -bottom-6 left-1/2 -translate-x-1/2 bg-black/80 text-white text-[12px] px-1.5 py-0.5 rounded whitespace-nowrap z-50 pointer-events-none shadow-sm">
+                        <div
+                            className="absolute -bottom-6 left-1/2 -translate-x-1/2 bg-black/80 text-[12px] px-1.5 py-0.5 rounded whitespace-nowrap z-50 pointer-events-none shadow-sm font-semibold"
+                            style={{ color: item.tagColor || '#ffffff' }}
+                        >
                             {item.tag}
                         </div>
                     )
