@@ -18,6 +18,7 @@ export default function Home() {
   const [gridItems, setGridItems] = useState<(AnimeItem & { layoutId: string })[]>([]);
   const [isDockOpen, setIsDockOpen] = useState(true);
   const [zoomLevel, setZoomLevel] = useState(1); // 1 = 100%
+  const [presetTags, setPresetTags] = useState<string[]>([]);
 
 
 
@@ -283,6 +284,7 @@ export default function Home() {
         left: themes.axis_left,
         right: themes.axis_right
       });
+      setPresetTags(themes.preset_tags || []);
 
       // Clean up old theme saves (delete previous layout info)
       try {
@@ -895,6 +897,7 @@ export default function Home() {
             showAxisLabels={showAxisLabels}
             externalDragClientXY={mobileDragClientXY}
             onBringToFront={handleBringToFront}
+            presetTags={presetTags}
           />
         </div>
       </div>

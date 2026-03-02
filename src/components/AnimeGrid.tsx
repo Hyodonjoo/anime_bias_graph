@@ -24,6 +24,7 @@ interface AnimeGridProps {
     showAxisLabels?: boolean;
     externalDragClientXY?: { x: number; y: number } | null;
     onBringToFront?: (id: string) => void;
+    presetTags?: string[];
 }
 
 const PRESET_COLORS = [
@@ -46,7 +47,8 @@ const DraggableGridItem = ({
     scale,
     isDragging,
     onUpdateTag,
-    isExport
+    isExport,
+    presetTags
 }: {
     item: AnimeItem & { layoutId: string };
     layoutItem: Layout;
@@ -56,6 +58,7 @@ const DraggableGridItem = ({
     isDragging: boolean;
     onUpdateTag?: (id: string, tag: string, tagColor?: string) => void;
     isExport?: boolean;
+    presetTags?: string[];
 }) => {
     // Local state for smooth dragging without dragging parent constantly
     const [position, setPosition] = useState({ x: layoutItem.x, y: layoutItem.y });
@@ -64,6 +67,7 @@ const DraggableGridItem = ({
     const [tagInput, setTagInput] = useState(item.tag || '');
     const [tagColorInput, setTagColorInput] = useState(item.tagColor || '#ffffff');
     const [showColorMenu, setShowColorMenu] = useState(false);
+    const [showPresetTagsMenu, setShowPresetTagsMenu] = useState(false);
     const inputRef = useRef<HTMLInputElement>(null);
 
     useEffect(() => {
@@ -101,11 +105,13 @@ const DraggableGridItem = ({
         setTagColorInput(item.tagColor || '#ffffff');
         setIsEditingTag(true);
         setShowColorMenu(false);
+        setShowPresetTagsMenu(false);
     };
 
     const handleTagSubmit = () => {
         setIsEditingTag(false);
         setShowColorMenu(false);
+        setShowPresetTagsMenu(false);
         if (onUpdateTag) {
             onUpdateTag(item.layoutId, tagInput.trim(), tagColorInput);
         }
@@ -118,6 +124,7 @@ const DraggableGridItem = ({
         } else if (e.key === 'Escape') {
             setIsEditingTag(false);
             setShowColorMenu(false);
+            setShowPresetTagsMenu(false);
             setTagInput(item.tag || '');
             setTagColorInput(item.tagColor || '#ffffff');
         }
@@ -177,11 +184,39 @@ const DraggableGridItem = ({
                             onChange={(e) => setTagInput(e.target.value)}
                             maxLength={12}
                             onKeyDown={handleTagKeyDown}
-                            onMouseDown={(e) => e.stopPropagation()}
-                            className="bg-transparent text-[12px] px-1.5 py-0.5 outline-none text-center w-24"
+                            onMouseDown={(e) => {
+                                e.stopPropagation();
+                                if (presetTags && presetTags.length > 0) {
+                                    setShowPresetTagsMenu(!showPresetTagsMenu);
+                                }
+                            }}
+                            className="bg-transparent text-[12px] px-1.5 py-0.5 outline-none text-center w-24 cursor-text"
                             placeholder="Tag..."
                             style={{ color: tagColorInput }}
                         />
+
+                        {/* Preset Tags Menu */}
+                        {showPresetTagsMenu && presetTags && (
+                            <div className="absolute top-full left-0 mt-1 w-full bg-black/95 border border-blue-500/50 rounded shadow-xl max-h-32 overflow-y-auto flex flex-col z-[70] scrollbar-thin">
+                                {presetTags.map(pTag => (
+                                    <button
+                                        key={pTag}
+                                        type="button"
+                                        onMouseDown={(e) => {
+                                            e.stopPropagation();
+                                            e.preventDefault();
+                                            setTagInput(pTag);
+                                            setShowPresetTagsMenu(false);
+                                            if (inputRef.current) inputRef.current.focus();
+                                        }}
+                                        className="text-[11px] text-white text-left px-2 py-1.5 hover:bg-gray-800 transition-colors w-full border-b border-gray-800 last:border-0"
+                                    >
+                                        {pTag}
+                                    </button>
+                                ))}
+                            </div>
+                        )}
+
                         <div className="w-[1px] h-4 bg-gray-600"></div>
 
                         {/* Expandable Color Menu Trigger */}
@@ -256,7 +291,7 @@ const DraggableGridItem = ({
 // Helper: Check intersection (Moved to gridUtils)
 // Helper: Check intersection (Moved to gridUtils)
 
-export default function AnimeGrid({ items, layout, onLayoutChange, onRemoveItem, onDrop, dockId, scale = 1, onDragStateChange, onUpdateTag, isExport = false, offset = { x: 0, y: 0 }, externalDragClientXY = null, onBringToFront }: AnimeGridProps) {
+export default function AnimeGrid({ items, layout, onLayoutChange, onRemoveItem, onDrop, dockId, scale = 1, onDragStateChange, onUpdateTag, isExport = false, offset = { x: 0, y: 0 }, externalDragClientXY = null, onBringToFront, presetTags = [] }: AnimeGridProps) {
     const [mounted, setMounted] = React.useState(false);
     const [draggingId, setDraggingId] = useState<string | null>(null);
     const [previewLayout, setPreviewLayout] = useState<Layout[] | null>(null);
@@ -529,6 +564,7 @@ export default function AnimeGrid({ items, layout, onLayoutChange, onRemoveItem,
                             isDragging={draggingId === item.layoutId}
                             onUpdateTag={onUpdateTag}
                             isExport={isExport}
+                            presetTags={presetTags}
                         />
                     );
                 })}
