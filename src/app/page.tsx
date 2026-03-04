@@ -529,35 +529,6 @@ export default function Home() {
       ctx.fillText(titleStr, titleX, titleY - 5);
       ctx.restore();
 
-      // Top Right: themePeriod (If exists)
-      if (themePeriod) {
-        ctx.save();
-        ctx.textAlign = 'right';
-        ctx.textBaseline = 'middle';
-        ctx.font = 'bold 16px sans-serif';
-        const pTextWidth = ctx.measureText(themePeriod).width;
-        const pPaddingX = 20;
-        const pPaddingY = 14;
-        const px = WIDTH - 40; // distance from right
-        const py = titleY - 5;
-
-        ctx.fillStyle = 'rgba(255, 255, 255, 0.05)';
-        ctx.strokeStyle = 'rgba(255, 255, 255, 0.1)';
-        ctx.lineWidth = 1.5;
-
-        ctx.beginPath();
-        if (typeof ctx.roundRect === 'function') {
-          ctx.roundRect(px - pTextWidth - pPaddingX, py - pPaddingY, pTextWidth + (pPaddingX * 2), pPaddingY * 2, 10);
-        } else {
-          ctx.rect(px - pTextWidth - pPaddingX, py - pPaddingY, pTextWidth + (pPaddingX * 2), pPaddingY * 2);
-        }
-        ctx.fill();
-        ctx.stroke();
-
-        ctx.fillStyle = '#d1d5db'; // gray-300
-        ctx.fillText(themePeriod, px - pPaddingX, py);
-        ctx.restore();
-      }
 
       // Decorative Energy Lines Below Title
       const decorY = titleY + 30;
@@ -692,22 +663,24 @@ export default function Home() {
 
         // Draw Tag if exists
         if (tag) {
-          ctx.font = '12px sans-serif';
+          ctx.font = 'bold 12px sans-serif';
           ctx.textAlign = 'center';
           ctx.textBaseline = 'top';
 
           const textWidth = ctx.measureText(tag).width;
-          const padding = 4;
+          const padding = 6;
           const tagX = x + ITEM_WIDTH / 2;
-          const tagY = y + ITEM_HEIGHT - 5; // Slightly overlapping bottom
+          const tagY = y + ITEM_HEIGHT + 6; // Move tag below the card so it doesn't overlap
 
           // Tag Background
-          ctx.fillStyle = 'rgba(0, 0, 0, 0.8)';
-          ctx.fillRect(tagX - textWidth / 2 - padding, tagY, textWidth + padding * 2, 18);
+          ctx.fillStyle = 'rgba(0, 0, 0, 0.85)';
+          ctx.beginPath();
+          ctx.roundRect(tagX - textWidth / 2 - padding, tagY, textWidth + padding * 2, 20, 4);
+          ctx.fill();
 
           // Tag Text
           ctx.fillStyle = tagColor || '#ffffff';
-          ctx.fillText(tag, tagX, tagY + 2);
+          ctx.fillText(tag, tagX, tagY + 4);
         }
       });
 
