@@ -18,6 +18,7 @@ export default function Home() {
   const [gridItems, setGridItems] = useState<(AnimeItem & { layoutId: string })[]>([]);
   const [isDockOpen, setIsDockOpen] = useState(true);
   const [zoomLevel, setZoomLevel] = useState(1); // 1 = 100%
+  const [presetTags, setPresetTags] = useState<string[]>([]);
 
 
 
@@ -230,6 +231,16 @@ export default function Home() {
     setPan(prev => getClampedPan(prev.x, prev.y, zoomLevel));
   }, [zoomLevel]);
 
+  const handleBringToFront = (layoutId: string) => {
+    setGridItems(prev => {
+      const idx = prev.findIndex(i => i.layoutId === layoutId);
+      if (idx === -1 || idx === prev.length - 1) return prev;
+      const newItems = [...prev];
+      const [item] = newItems.splice(idx, 1);
+      newItems.push(item);
+      return newItems;
+    });
+  };
 
   useEffect(() => {
     setMounted(true);
@@ -273,6 +284,7 @@ export default function Home() {
         left: themes.axis_left,
         right: themes.axis_right
       });
+      setPresetTags(themes.preset_tags || []);
 
       // Clean up old theme saves (delete previous layout info)
       try {
@@ -350,9 +362,9 @@ export default function Home() {
     setLayout(prev => prev.filter(l => (l as any).i !== id));
   };
 
-  const handleUpdateTag = (layoutId: string, tag: string) => {
+  const handleUpdateTag = (layoutId: string, tag: string, tagColor?: string) => {
     setGridItems(prev => prev.map(item =>
-      item.layoutId === layoutId ? { ...item, tag } : item
+      item.layoutId === layoutId ? { ...item, tag, tagColor } : item
     ));
   };
 
@@ -634,14 +646,14 @@ export default function Home() {
           };
         });
 
-        return { img, x: layoutItem.x, y: layoutItem.y, title: item.title, tag: item.tag };
+        return { img, x: layoutItem.x, y: layoutItem.y, title: item.title, tag: item.tag, tagColor: item.tagColor };
       });
 
       const loadedImages = await Promise.all(imageLoadPromises);
       // Draw images in order
       loadedImages.forEach(data => {
         if (!data) return;
-        const { img, x, y, tag } = data;
+        const { img, x, y, tag, tagColor } = data;
         const ITEM_WIDTH = 100;
         const ITEM_HEIGHT = 150;
 
@@ -694,7 +706,7 @@ export default function Home() {
           ctx.fillRect(tagX - textWidth / 2 - padding, tagY, textWidth + padding * 2, 18);
 
           // Tag Text
-          ctx.fillStyle = '#ffffff';
+          ctx.fillStyle = tagColor || '#ffffff';
           ctx.fillText(tag, tagX, tagY + 2);
         }
       });
@@ -884,6 +896,8 @@ export default function Home() {
             offset={pan}
             showAxisLabels={showAxisLabels}
             externalDragClientXY={mobileDragClientXY}
+            onBringToFront={handleBringToFront}
+            presetTags={presetTags}
           />
         </div>
       </div>

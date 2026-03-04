@@ -20,6 +20,8 @@ export default function AdminPage() {
     const [themePeriod, setThemePeriod] = useState('');
     const [axisLabels, setAxisLabels] = useState({ top: '', bottom: '', left: '', right: '' });
     const [dockItems, setDockItems] = useState<AnimeItem[]>([]);
+    const [presetTags, setPresetTags] = useState<string[]>([]);
+    const [newTagInput, setNewTagInput] = useState('');
     const [newAnime, setNewAnime] = useState<{ id?: string, title: string, imageUrl: string, year: number }>({ id: '', title: '', imageUrl: '', year: 2024 });
 
     // History State
@@ -87,6 +89,17 @@ export default function AdminPage() {
         setLayout(prev => prev.filter(l => l.i !== layoutId));
     };
 
+    const handleBringToFrontPreview = (layoutId: string) => {
+        setGridItems(prev => {
+            const idx = prev.findIndex(i => i.layoutId === layoutId);
+            if (idx === -1 || idx === prev.length - 1) return prev;
+            const newItems = [...prev];
+            const [item] = newItems.splice(idx, 1);
+            newItems.push(item);
+            return newItems;
+        });
+    };
+
     const fetchHistory = async () => {
         if (!isAuthenticated) return;
         const { data } = await supabase.from('themes').select('id, title, created_at').order('created_at', { ascending: false });
@@ -111,6 +124,7 @@ export default function AdminPage() {
                 left: theme.axis_left,
                 right: theme.axis_right
             });
+            setPresetTags(theme.preset_tags || []);
         }
 
         // 2. Fetch Anime Items
@@ -199,6 +213,7 @@ export default function AdminPage() {
         setThemeTitle('');
         setThemePeriod('');
         setAxisLabels({ top: '', bottom: '', left: '', right: '' });
+        setPresetTags([]);
         setDockItems([]);
         setSelectedHistoryId('');
         setNewAnime({ id: '', title: '', imageUrl: '', year: 2024 });
@@ -265,6 +280,7 @@ export default function AdminPage() {
                     axis_bottom: axisLabels.bottom,
                     axis_left: axisLabels.left,
                     axis_right: axisLabels.right,
+                    preset_tags: presetTags,
                     is_active: true, // Apply
                 }).eq('id', targetId);
 
@@ -286,6 +302,7 @@ export default function AdminPage() {
                     axis_bottom: axisLabels.bottom,
                     axis_left: axisLabels.left,
                     axis_right: axisLabels.right,
+                    preset_tags: presetTags,
                     is_active: true, // Apply
                     created_at: new Date().toISOString()
                 }).select().single();
@@ -337,6 +354,7 @@ export default function AdminPage() {
                     axis_bottom: axisLabels.bottom,
                     axis_left: axisLabels.left,
                     axis_right: axisLabels.right,
+                    preset_tags: presetTags,
                     // do NOT update is_active to preserve its current state (active or inactive)
                 }).eq('id', targetId);
 
@@ -353,6 +371,7 @@ export default function AdminPage() {
                     axis_bottom: axisLabels.bottom,
                     axis_left: axisLabels.left,
                     axis_right: axisLabels.right,
+                    preset_tags: presetTags,
                     is_active: false, // Draft
                     created_at: new Date().toISOString()
                 }).select().single();
@@ -591,6 +610,53 @@ export default function AdminPage() {
                     </div>
                 </div>
 
+                {/* Preset Tags Config */}
+                <div>
+                    <h3 className="text-sm font-semibold text-gray-400 uppercase tracking-wider mb-4 border-b border-gray-800 pb-2">기본 제공 태그 ({presetTags.length})</h3>
+                    <div className="flex gap-2 mb-3">
+                        <input
+                            value={newTagInput}
+                            onChange={e => setNewTagInput(e.target.value)}
+                            onKeyDown={e => {
+                                if (e.key === 'Enter') {
+                                    e.preventDefault();
+                                    if (newTagInput.trim() && !presetTags.includes(newTagInput.trim())) {
+                                        setPresetTags([...presetTags, newTagInput.trim()]);
+                                        setNewTagInput('');
+                                    }
+                                }
+                            }}
+                            placeholder="태그 입력 후 Enter"
+                            className="flex-1 bg-gray-950 border border-gray-800 rounded p-2 text-sm outline-none focus:border-purple-500"
+                        />
+                        <button
+                            onClick={() => {
+                                if (newTagInput.trim() && !presetTags.includes(newTagInput.trim())) {
+                                    setPresetTags([...presetTags, newTagInput.trim()]);
+                                    setNewTagInput('');
+                                }
+                            }}
+                            className="bg-purple-600 hover:bg-purple-700 text-white rounded px-3 py-1 text-sm font-bold transition-colors"
+                        >
+                            추가
+                        </button>
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                        {presetTags.map(tag => (
+                            <div key={tag} className="flex items-center gap-1 bg-gray-800 text-gray-200 text-xs px-2 py-1 rounded border border-gray-700">
+                                <span>{tag}</span>
+                                <button
+                                    onClick={() => setPresetTags(presetTags.filter(t => t !== tag))}
+                                    className="text-gray-400 hover:text-red-400 ml-1 font-bold"
+                                    title="태그 삭제"
+                                >
+                                    ✕
+                                </button>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+
                 {/* Anime Manager */}
                 <div className="flex-1">
                     <h3 className="text-sm font-semibold text-gray-400 uppercase tracking-wider mb-4 border-b border-gray-800 pb-2">애니 목록 ({dockItems.length})</h3>
@@ -793,6 +859,7 @@ export default function AdminPage() {
                         scale={0.85}
                         showAxisLabels={true}
                         dockId="anime-dock-preview"
+                        onBringToFront={handleBringToFrontPreview}
                     />
                 </div>
 
