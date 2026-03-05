@@ -466,23 +466,15 @@ export default function Home() {
       ctx.shadowColor = 'transparent'; // reset shadow for stroke & others
       ctx.stroke();
 
-      // Inner Diamond shape
-      ctx.save();
-      ctx.translate(logoStartX + (logoSize / 2), logoCenterY);
-      ctx.rotate(45 * Math.PI / 180);
-      const diamondRadius = 10;
-      const innerGrad = ctx.createLinearGradient(-diamondRadius, -diamondRadius, diamondRadius, diamondRadius);
-      innerGrad.addColorStop(0, '#ffffff');
-      innerGrad.addColorStop(1, '#6b7280'); // gray-500
-      ctx.fillStyle = innerGrad;
-      ctx.beginPath();
-      if (typeof ctx.roundRect === 'function') {
-        ctx.roundRect(-diamondRadius, -diamondRadius, diamondRadius * 2, diamondRadius * 2, 2);
-      } else {
-        ctx.rect(-diamondRadius, -diamondRadius, diamondRadius * 2, diamondRadius * 2);
-      }
-      ctx.fill();
-      ctx.restore();
+      // [NEW] Load and draw logo image
+      const logoImg = new Image();
+      logoImg.crossOrigin = 'anonymous';
+      logoImg.src = 'https://example.com/logo.png';
+      await new Promise((resolve) => {
+        logoImg.onload = resolve;
+        logoImg.onerror = resolve; // Continue even if logo fails
+      });
+      ctx.drawImage(logoImg, logoStartX + 5, logoCenterY - (logoSize / 2) + 5, logoSize - 10, logoSize - 10);
 
       // Site Identity Text
       ctx.textAlign = 'left';
@@ -754,8 +746,8 @@ export default function Home() {
         <div className="flex items-center gap-5 relative z-10 h-full">
           <div className="relative group cursor-pointer">
             <div className="absolute -inset-1 bg-gradient-to-r from-blue-600 to-violet-600 rounded-lg blur opacity-25 group-hover:opacity-75 transition duration-500"></div>
-            <div className="relative flex items-center justify-center w-10 h-10 bg-zinc-900 ring-1 ring-white/10 rounded-lg shadow-xl">
-              <div className="w-4 h-4 rounded-sm bg-gradient-to-br from-white to-gray-500 transform rotate-45 group-hover:rotate-90 transition-transform duration-500"></div>
+            <div className="relative flex items-center justify-center w-10 h-10 bg-zinc-900 ring-1 ring-white/10 rounded-lg shadow-xl overflow-hidden p-[2px]">
+              <img src="https://example.com/logo.png" alt="Logo" className="w-full h-full object-contain group-hover:scale-110 transition-transform duration-500" crossOrigin="anonymous" />
             </div>
           </div>
           <div className="hidden md:flex flex-col shrink-0">
