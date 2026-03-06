@@ -469,7 +469,7 @@ export default function Home() {
       // [NEW] Load and draw logo image
       const logoImg = new Image();
       logoImg.crossOrigin = 'anonymous';
-      logoImg.src = 'https://example.com/logo.png';
+      logoImg.src = 'https://adunuwyeehbtrhpyiiiu.supabase.co/storage/v1/object/public/anime-assets/logo.png';
       await new Promise((resolve) => {
         logoImg.onload = resolve;
         logoImg.onerror = resolve; // Continue even if logo fails
@@ -747,7 +747,7 @@ export default function Home() {
           <div className="relative group cursor-pointer">
             <div className="absolute -inset-1 bg-gradient-to-r from-blue-600 to-violet-600 rounded-lg blur opacity-25 group-hover:opacity-75 transition duration-500"></div>
             <div className="relative flex items-center justify-center w-10 h-10 bg-zinc-900 ring-1 ring-white/10 rounded-lg shadow-xl overflow-hidden p-[2px]">
-              <img src="https://example.com/logo.png" alt="Logo" className="w-full h-full object-contain group-hover:scale-110 transition-transform duration-500" crossOrigin="anonymous" />
+              <img src="https://adunuwyeehbtrhpyiiiu.supabase.co/storage/v1/object/public/anime-assets/logo.png" alt="Logo" className="w-full h-full object-contain group-hover:scale-110 transition-transform duration-500" crossOrigin="anonymous" />
             </div>
           </div>
           <div className="hidden md:flex flex-col shrink-0">

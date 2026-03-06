@@ -190,6 +190,13 @@ const DraggableGridItem = ({
                                     setShowPresetTagsMenu(!showPresetTagsMenu);
                                 }
                             }}
+                            onTouchStart={(e) => {
+                                e.stopPropagation();
+                                if (presetTags && presetTags.length > 0) {
+                                    // Let default behavior happen for input focus, just stop propagation for drag
+                                    setShowPresetTagsMenu(!showPresetTagsMenu);
+                                }
+                            }}
                             className="bg-transparent text-[12px] px-1.5 py-0.5 outline-none text-center w-24 cursor-text"
                             placeholder="Tag..."
                             style={{ color: tagColorInput }}
@@ -203,6 +210,13 @@ const DraggableGridItem = ({
                                         key={pTag}
                                         type="button"
                                         onMouseDown={(e) => {
+                                            e.stopPropagation();
+                                            e.preventDefault();
+                                            setTagInput(pTag);
+                                            setShowPresetTagsMenu(false);
+                                            if (inputRef.current) inputRef.current.focus();
+                                        }}
+                                        onTouchStart={(e) => {
                                             e.stopPropagation();
                                             e.preventDefault();
                                             setTagInput(pTag);
@@ -228,6 +242,11 @@ const DraggableGridItem = ({
                                     e.preventDefault();
                                     setShowColorMenu(!showColorMenu);
                                 }}
+                                onTouchStart={(e) => {
+                                    e.stopPropagation();
+                                    e.preventDefault();
+                                    setShowColorMenu(!showColorMenu);
+                                }}
                                 className="w-5 h-5 rounded-sm border border-gray-500 cursor-pointer hover:border-white transition-colors"
                                 style={{ backgroundColor: tagColorInput }}
                                 title="Select color"
@@ -243,6 +262,13 @@ const DraggableGridItem = ({
                                             key={col}
                                             type="button"
                                             onMouseDown={(e) => {
+                                                e.stopPropagation();
+                                                e.preventDefault();
+                                                setTagColorInput(col);
+                                                setShowColorMenu(false);
+                                                if (inputRef.current) inputRef.current.focus();
+                                            }}
+                                            onTouchStart={(e) => {
                                                 e.stopPropagation();
                                                 e.preventDefault();
                                                 setTagColorInput(col);
