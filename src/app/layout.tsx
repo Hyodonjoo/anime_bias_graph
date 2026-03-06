@@ -15,6 +15,9 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: "애니 성향 좌표 그리기",
   description: "Create and share your own anime bias coordinate grid.",
+  icons: {
+    icon: "https://adunuwyeehbtrhpyiiiu.supabase.co/storage/v1/object/public/anime-assets/logo.png"
+  }
 };
 
 export const viewport: Viewport = {

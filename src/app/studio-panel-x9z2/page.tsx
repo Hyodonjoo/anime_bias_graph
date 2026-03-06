@@ -766,8 +766,8 @@ export default function AdminPage() {
                     <div className="flex items-center gap-5 relative z-10 h-full">
                         <div className="relative group cursor-pointer">
                             <div className="absolute -inset-1 bg-gradient-to-r from-blue-600 to-violet-600 rounded-lg blur opacity-25 group-hover:opacity-75 transition duration-500"></div>
-                            <div className="relative flex items-center justify-center w-10 h-10 bg-zinc-900 ring-1 ring-white/10 rounded-lg shadow-xl">
-                                <div className="w-4 h-4 rounded-sm bg-gradient-to-br from-white to-gray-500 transform rotate-45 group-hover:rotate-90 transition-transform duration-500"></div>
+                            <div className="relative flex items-center justify-center w-10 h-10 bg-zinc-900 ring-1 ring-white/10 rounded-lg shadow-xl overflow-hidden p-[2px]">
+                                <img src="https://adunuwyeehbtrhpyiiiu.supabase.co/storage/v1/object/public/anime-assets/logo.png" alt="Logo" className="w-full h-full object-contain group-hover:scale-110 transition-transform duration-500" crossOrigin="anonymous" />
                             </div>
                         </div>
                         <div className="hidden md:flex flex-col">
