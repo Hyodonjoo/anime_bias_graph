@@ -740,7 +740,7 @@ export default function AdminPage() {
                         onClick={handleUpdateDraft}
                         className="w-full bg-gray-800 hover:bg-gray-700 py-3 rounded-lg font-bold text-white shadow-lg transition-all border border-gray-600"
                     >
-                        주제 업데이트 (미적용)
+                        {selectedHistoryId ? '주제 업데이트 (미적용)' : '주제 추가 (미적용)'}
                     </button>
                     <button
                         onClick={handleUpdateAndApply}
