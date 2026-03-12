@@ -22,7 +22,7 @@ export default function AdminPage() {
     const [dockItems, setDockItems] = useState<AnimeItem[]>([]);
     const [presetTags, setPresetTags] = useState<string[]>([]);
     const [newTagInput, setNewTagInput] = useState('');
-    const [newAnime, setNewAnime] = useState<{ id?: string, title: string, imageUrl: string, year: number }>({ id: '', title: '', imageUrl: '', year: 2024 });
+    const [newAnime, setNewAnime] = useState<{ id?: string, title: string, imageUrl: string, year: number }>({ id: '', title: '', imageUrl: '', year: 2026 });
 
     // History State
     const [historyThemes, setHistoryThemes] = useState<any[]>([]);
@@ -162,7 +162,7 @@ export default function AdminPage() {
             };
             setDockItems([...dockItems, newItem]);
         }
-        setNewAnime({ id: '', title: '', imageUrl: '', year: 2024 });
+        setNewAnime({ id: '', title: '', imageUrl: '', year: 2026 });
     };
 
     const removeAnimeItem = (id: string) => {
@@ -216,7 +216,7 @@ export default function AdminPage() {
         setPresetTags([]);
         setDockItems([]);
         setSelectedHistoryId('');
-        setNewAnime({ id: '', title: '', imageUrl: '', year: 2024 });
+        setNewAnime({ id: '', title: '', imageUrl: '', year: 2026 });
 
         // Update preview
         setGridItems([]);
@@ -580,7 +580,7 @@ export default function AdminPage() {
                             <input
                                 value={themePeriod}
                                 onChange={(e) => setThemePeriod(e.target.value)}
-                                placeholder="예: 2024. 01 ~ 2024. 03"
+                                placeholder="예: 2026. 01 ~ 2026. 03"
                                 className="w-full bg-gray-950 border border-gray-800 rounded p-2 focus:ring-1 focus:ring-purple-500 outline-none transition-all"
                             />
                         </div>
@@ -670,7 +670,7 @@ export default function AdminPage() {
                             {newAnime.id && (
 
                                 <button
-                                    onClick={() => setNewAnime({ id: '', title: '', imageUrl: '', year: 2024 })}
+                                    onClick={() => setNewAnime({ id: '', title: '', imageUrl: '', year: 2026 })}
                                     className="text-xs text-gray-500 hover:text-white"
                                 >
                                     수정 취소
