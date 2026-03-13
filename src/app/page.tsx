@@ -6,8 +6,9 @@ import AnimeGrid from '@/components/AnimeGrid';
 import AnimeDock from '@/components/AnimeDock';
 import { AnimeItem } from '@/lib/mockData';
 import { supabase } from '@/lib/supabase';
-import { ChevronUp, ChevronDown, ChevronLeft, ChevronRight, Download, Plus, Minus, Eye, EyeOff } from 'lucide-react';
+import { ChevronUp, ChevronDown, ChevronLeft, ChevronRight, Download, Plus, Minus, Eye, EyeOff, Info } from 'lucide-react';
 import { resolveLayout } from '@/lib/gridUtils';
+import LegalModal from '@/components/LegalModal';
 
 export default function Home() {
   const [themeTitle, setThemeTitle] = useState('');
@@ -19,8 +20,7 @@ export default function Home() {
   const [isDockOpen, setIsDockOpen] = useState(true);
   const [zoomLevel, setZoomLevel] = useState(1); // 1 = 100%
   const [presetTags, setPresetTags] = useState<string[]>([]);
-
-
+  const [isLegalModalOpen, setIsLegalModalOpen] = useState(false);
 
   const handleZoomIn = () => setZoomLevel(prev => Math.min(prev + 0.1, 1.5));
   const handleZoomOut = () => setZoomLevel(prev => Math.max(prev - 0.1, 0.7));
@@ -962,6 +962,23 @@ export default function Home() {
           <img src={draggingDockItem.imageUrl} className="w-full h-full object-cover" alt="dragging" />
         </div>
       )}
+
+      {/* Copyright & Legal Toggle */}
+      <div className="fixed bottom-3 right-4 z-50 flex items-center gap-3 text-xs text-stone-500/80 pointer-events-auto">
+        <span className="font-medium tracking-wide">Copyright &copy; 2026 animebias coordinate grid</span>
+        <button 
+          onClick={() => setIsLegalModalOpen(true)}
+          className="flex items-center gap-1.5 hover:text-stone-300 transition-colors bg-stone-900/50 hover:bg-stone-800 px-3 py-1.5 rounded-full border border-stone-800 backdrop-blur-sm shadow-xl"
+        >
+          <Info size={14} />
+          <span className="font-semibold">이용약관</span>
+        </button>
+      </div>
+
+      <LegalModal 
+        isOpen={isLegalModalOpen} 
+        onClose={() => setIsLegalModalOpen(false)} 
+      />
     </main>
   );
 }
